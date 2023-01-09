@@ -1,16 +1,3 @@
-# Secret Rock-Paper-Scissors
-
-This repo contains the secret contract implementation of a rock paper scissors game. 
-
-It's fairly straightforward if you know your way around a CosmWasm contract, and is mainly intended to be used as an example of some tricks and usages of common libraries or other scenarios contract developers may encounter.
-
-You will find:
-
-* Usage of Secret Toolkit, specifically the PRNG and generation of a random string
-* Usage of cw-storage-plus
-* Sending native tokens
-* Storing and reading to/from state
-* How to create a powerful CI with Github Actions
 
 ## Gitpod
 
