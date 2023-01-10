@@ -1,0 +1,20 @@
+[package]
+name = "ec_curve"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libsecp256k1 = { git = "https://github.com/cashmaney/libsecp256k1", branch = "wasm", default-features = false, features = ["static-context", "wasm"] }
+rand_core = { version = "0.6.4", default-features = false }
+impl_ops = "0.1.1"
+hex = "0.4.3"
+
+num-traits = "0.2.15"
+num-bigint = { version = "0.4.3", default-features = false }
+num-integer = "0.1.45"
+
+serde = { version = "1.0.152", features = ["derive"] }
+
+arrayref = "0.3"

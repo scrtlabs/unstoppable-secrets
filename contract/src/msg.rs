@@ -8,9 +8,9 @@ pub struct InstantiateMsg {
     /// We can assume for simplicity that the user that initializes the contract supplies these
     // public_keys = Vec<String>
     /// The number of users that will be a part of the secret sharing and signing process
-    number_of_users: u32,
+    pub number_of_users: u32,
     /// You need (t + 1) shares to reconstruct the secret value
-    signing_threshold: u32
+    pub signing_threshold: u32
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

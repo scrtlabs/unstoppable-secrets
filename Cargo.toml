@@ -1,19 +1,6 @@
-[package]
-name = "secret_contract_example"
-version = "0.1.0"
-authors = ["SecretTemplateExample"]
-edition = "2021"
+[workspace]
+members = ["packages/ec_curve", "packages/sss", "contract"]
 resolver = "2"
-exclude = [
-  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
-  "contract.wasm",
-  "hash.txt",
-]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-crate-type = ["cdylib", "rlib"]
 
 [profile.release]
 opt-level = 3
@@ -25,49 +12,3 @@ codegen-units = 1
 panic = 'abort'
 incremental = false
 overflow-checks = true
-
-[features]
-default = []
-# for quicker tests, cargo test --lib
-# for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
-schema = ["cosmwasm-schema"]
-
-[dependencies]
-serde = { version = "1.0.147", default-features = false, features = ["derive"] }
-schemars = "0.8.11"
-cosmwasm-std = { git = "https://github.com/scrtlabs/cosmwasm", branch = "secret-cw1.1", package = "secret-cosmwasm-std" }
-cosmwasm-storage = { git = "https://github.com/scrtlabs/cosmwasm", branch = "secret-cw1.1", package = "secret-cosmwasm-storage" }
-#cw-storage-plus = { version = "0.14.0", default-features = false }
-
-# Used only for schema generation
-cosmwasm-schema = { version = "1.1.0", optional = true }
-
-# Uncomment these for some common extra tools
-#secret-toolkit-crypto = { version = "0.6.0", features = ["rand", "hash"]}
-
-# custom deps
-base32 = "0.4.0"
-thiserror = "1.0"
-
-rand_core = { version = "0.6.4", default-features = false }
-rand_chacha = { version = "0.3.1", default-features = false }
-
-vsss-rs = { version = "2.3.2", default-features = false, features = ["secp256k1"]}
-
-k256 = { version = "0.11", default-features = false }
-# ff = "0.13.0"
-#generic-array = "0.12"
-#ff = "0.13.0"
-rand = { version = "0.8.5", default-features = false }
-sha2 = "0.10.6"
-#
-#ursa_sharing = { version = "0.1.0", git = "https://github.com/hyperledger/ursa"}
-
-#[patch.crates-io]
-#cosmwasm-std = { git = "https://github.com/scrtlabs/cosmwasm", branch = "Cashmaney-patch-1", package = "secret-cosmwasm-std" }
-
-[[bin]]
-name = "schema"
-required-features = ["schema"]
-
