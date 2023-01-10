@@ -64,7 +64,7 @@ store-contract-local:
 
 .PHONY: intantiate-local
 instantiate-local:
-	docker exec secretdev secretcli tx compute instantiate 2 '{"number_of_users": 0, "signing_threshold": 0}' -y  --from a --gas 5000000 --label yo
+	docker exec secretdev secretcli tx compute instantiate 1 '{"number_of_users": 0, "signing_threshold": 0}' -y  --from a --gas 5000000 --label yo2
 
 .PHONY: cli-store-contract
 cli-store-contract:
