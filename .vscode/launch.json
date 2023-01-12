@@ -7,16 +7,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'secret_contract_example'",
+            "name": "Debug unit tests in library 'unstoppable_secrets'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=secret_contract_example"
+                    "--package=unstoppable_secrets"
                 ],
                 "filter": {
-                    "name": "secret_contract_example",
+                    "name": "unstoppable_secrets",
                     "kind": "lib"
                 }
             },
