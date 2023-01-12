@@ -1079,27 +1079,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "secret_contract_example"
-version = "0.1.0"
-dependencies = [
- "base32",
- "bincode2",
- "cosmwasm-schema",
- "cosmwasm-std",
- "cosmwasm-storage",
- "cw-storage-plus",
- "hex",
- "rand",
- "rand_chacha",
- "rand_core 0.6.4",
- "schemars",
- "scrt_sss",
- "serde",
- "sha2 0.10.6",
- "thiserror",
-]
-
-[[package]]
 name = "semver"
 version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1285,6 +1264,27 @@ name = "unicode-ident"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84a22b9f218b40614adcb3f4ff08b703773ad44fa9423e4e0d346d5db86e4ebc"
+
+[[package]]
+name = "unstoppable_secrets"
+version = "0.1.0"
+dependencies = [
+ "base32",
+ "bincode2",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "hex",
+ "rand",
+ "rand_chacha",
+ "rand_core 0.6.4",
+ "schemars",
+ "scrt_sss",
+ "serde",
+ "sha2 0.10.6",
+ "thiserror",
+]
 
 [[package]]
 name = "value-bag"
