@@ -291,10 +291,6 @@ mod tests {
 
     use bincode2;
     use rand::thread_rng;
-    use rstest::rstest;
-    use serde_json;
-
-    use super::*;
 
     #[test]
     fn test_serialization_empty() {

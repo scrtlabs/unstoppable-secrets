@@ -397,7 +397,7 @@ mod tests {
         macro_rules! test_equal_num {
             ($($t:ty)*) =>($(
                 let a: $t = 1;
-                assert_eq!(ScalarElement::from_num(a), one);
+                assert_eq!(Secp256k1Scalar::from_num(a), one);
             )*);
         }
 
