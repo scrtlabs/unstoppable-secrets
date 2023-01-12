@@ -1,10 +1,10 @@
 // use crate::ec_curve::secp256k1::Point;
 // //use super::ScalarElement;
-use core::ops::{Sub, Add, Mul};
+use super::{open, Error};
+use core::ops::{Add, Mul, Sub};
 use ec_curve::traits::ECScalar;
-use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
-use super::{Error, open};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Share<T: ECScalar + Default + Serialize + DeserializeOwned> {
@@ -15,14 +15,12 @@ pub struct Share<T: ECScalar + Default + Serialize + DeserializeOwned> {
     pub share_count: u8,
 }
 
-
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SecretShares<T: ECScalar + Serialize + DeserializeOwned>(
-    #[serde(bound = "")]
-    pub Vec<Share<T>>
+    #[serde(bound = "")] pub Vec<Share<T>>,
 );
 
-impl <T: ECScalar> SecretShares<T> {
+impl<T: ECScalar> SecretShares<T> {
     pub fn new(shares: Vec<Share<T>>) -> SecretShares<T> {
         SecretShares(shares)
     }
@@ -32,159 +30,206 @@ impl <T: ECScalar> SecretShares<T> {
     }
 }
 
-
-
-pub trait Shareable where Self: ECScalar {
+pub trait Shareable
+where
+    Self: ECScalar,
+{
     fn split(&self) -> SecretShares<Self>;
 }
 
-impl <T: ECScalar> Add<Share<T>> for Share<T> {
+impl<T: ECScalar> Add<Share<T>> for Share<T> {
     type Output = Share<T>;
     fn add(self, rhs: Share<T>) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data + rhs.data }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data + rhs.data,
+        }
     }
 }
 
-impl <'a, 'b, T: ECScalar> Add<&'a Share<T>> for &'b Share<T> {
+impl<'a, 'b, T: ECScalar> Add<&'a Share<T>> for &'b Share<T> {
     type Output = Share<T>;
     fn add(self, rhs: &'a Share<T>) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data.clone() + rhs.data.clone() }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data.clone() + rhs.data.clone(),
+        }
     }
 }
 
-impl <T: ECScalar> Sub<Share<T>> for Share<T> {
+impl<T: ECScalar> Sub<Share<T>> for Share<T> {
     type Output = Share<T>;
     fn sub(self, rhs: Share<T>) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data - rhs.data }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data - rhs.data,
+        }
     }
 }
 
-impl <'a, 'b, T: ECScalar> Sub<&'a Share<T>> for &'b Share<T> {
+impl<'a, 'b, T: ECScalar> Sub<&'a Share<T>> for &'b Share<T> {
     type Output = Share<T>;
     fn sub(self, rhs: &'a Share<T>) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data.clone() - rhs.data.clone() }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data.clone() - rhs.data.clone(),
+        }
     }
 }
 
-impl <T: ECScalar> Add<T> for Share<T> {
+impl<T: ECScalar> Add<T> for Share<T> {
     type Output = Share<T>;
     fn add(self, rhs: T) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data + rhs }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data + rhs,
+        }
     }
 }
 
-impl <'a, 'b, T: ECScalar> Add<&'a T> for &'b Share<T> {
+impl<'a, 'b, T: ECScalar> Add<&'a T> for &'b Share<T> {
     type Output = Share<T>;
     fn add(self, rhs: &'a T) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data.clone() + rhs.clone() }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data.clone() + rhs.clone(),
+        }
     }
 }
 
-impl <T: ECScalar> Sub<T> for Share<T> {
+impl<T: ECScalar> Sub<T> for Share<T> {
     type Output = Share<T>;
     fn sub(self, rhs: T) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data - rhs }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data - rhs,
+        }
     }
 }
 
-impl <'a, 'b, T: ECScalar> Sub<&'a T> for &'b Share<T> {
+impl<'a, 'b, T: ECScalar> Sub<&'a T> for &'b Share<T> {
     type Output = Share<T>;
     fn sub(self, rhs: &'a T) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data.clone() - rhs.clone() }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data.clone() - rhs.clone(),
+        }
     }
 }
 
-impl <T: ECScalar> Mul<T> for Share<T> {
+impl<T: ECScalar> Mul<T> for Share<T> {
     type Output = Share<T>;
     fn mul(self, rhs: T) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data * rhs }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data * rhs,
+        }
     }
 }
 
-impl <'a, 'b, T: ECScalar> Mul<&'a T> for &'b Share<T> {
+impl<'a, 'b, T: ECScalar> Mul<&'a T> for &'b Share<T> {
     type Output = Share<T>;
     fn mul(self, rhs: &'a T) -> Share<T> {
-        Share { id: self.id, threshold: self.threshold, share_count: self.share_count,
-            data: self.data.clone() * rhs.clone() }
+        Share {
+            id: self.id,
+            threshold: self.threshold,
+            share_count: self.share_count,
+            data: self.data.clone() * rhs.clone(),
+        }
     }
 }
 
-impl <T: ECScalar> Add<T> for SecretShares<T> {
+impl<T: ECScalar> Add<T> for SecretShares<T> {
     type Output = SecretShares<T>;
     fn add(self, rhs: T) -> SecretShares<T> {
         let mut z = SecretShares::default();
-        self.0.iter().map(|item| {
-            z.0.push(item.clone() + rhs.clone())
-        }).count();
+        self.0
+            .iter()
+            .map(|item| z.0.push(item.clone() + rhs.clone()))
+            .count();
         z
     }
 }
 
-impl <'a, 'b, T: ECScalar> Add<&'a T> for &'b SecretShares<T> {
+impl<'a, 'b, T: ECScalar> Add<&'a T> for &'b SecretShares<T> {
     type Output = SecretShares<T>;
     fn add(self, rhs: &'a T) -> SecretShares<T> {
         let mut z = SecretShares::default();
-        self.0.iter().map(|item| {
-            z.0.push(item.clone() + rhs.clone())
-        }).count();
+        self.0
+            .iter()
+            .map(|item| z.0.push(item.clone() + rhs.clone()))
+            .count();
         z
     }
 }
 
-impl <T: ECScalar> Sub<T> for SecretShares<T> {
+impl<T: ECScalar> Sub<T> for SecretShares<T> {
     type Output = SecretShares<T>;
     fn sub(self, rhs: T) -> SecretShares<T> {
         let mut z = SecretShares::default();
-        self.0.iter().map(|item| {
-            z.0.push(item.clone() - rhs.clone())
-        }).count();
+        self.0
+            .iter()
+            .map(|item| z.0.push(item.clone() - rhs.clone()))
+            .count();
         z
     }
 }
 
-impl <'a, 'b, T: ECScalar> Sub<&'a T> for &'b SecretShares<T> {
+impl<'a, 'b, T: ECScalar> Sub<&'a T> for &'b SecretShares<T> {
     type Output = SecretShares<T>;
     fn sub(self, rhs: &'a T) -> SecretShares<T> {
         let mut z = SecretShares::default();
-        self.0.iter().map(|item| {
-            z.0.push(item.clone() - rhs.clone())
-        }).count();
+        self.0
+            .iter()
+            .map(|item| z.0.push(item.clone() - rhs.clone()))
+            .count();
         z
     }
 }
 
-impl <T: ECScalar> Mul<T> for SecretShares<T> {
+impl<T: ECScalar> Mul<T> for SecretShares<T> {
     type Output = SecretShares<T>;
     fn mul(self, rhs: T) -> SecretShares<T> {
         let mut z = SecretShares::default();
-        self.0.iter().map(|item| {
-            z.0.push(item.clone() * rhs.clone())
-        }).count();
+        self.0
+            .iter()
+            .map(|item| z.0.push(item.clone() * rhs.clone()))
+            .count();
         z
     }
 }
 
-impl <'a, 'b, T: ECScalar> Mul<&'a T> for &'b SecretShares<T> {
+impl<'a, 'b, T: ECScalar> Mul<&'a T> for &'b SecretShares<T> {
     type Output = SecretShares<T>;
     fn mul(self, rhs: &'a T) -> SecretShares<T> {
         let mut z = SecretShares::default();
-        self.0.iter().map(|item| {
-            z.0.push(item.clone() * rhs.clone())
-        }).count();
+        self.0
+            .iter()
+            .map(|item| z.0.push(item.clone() * rhs.clone()))
+            .count();
         z
     }
 }
 
-impl <T: ECScalar> Add<SecretShares<T>> for SecretShares<T> {
+impl<T: ECScalar> Add<SecretShares<T>> for SecretShares<T> {
     type Output = SecretShares<T>;
     fn add(self, rhs: SecretShares<T>) -> SecretShares<T> {
         let mut z = SecretShares::default();
@@ -195,7 +240,7 @@ impl <T: ECScalar> Add<SecretShares<T>> for SecretShares<T> {
     }
 }
 
-impl <'a, 'b, T: ECScalar> Add<&'a SecretShares<T>> for &'b SecretShares<T> {
+impl<'a, 'b, T: ECScalar> Add<&'a SecretShares<T>> for &'b SecretShares<T> {
     type Output = SecretShares<T>;
     fn add(self, rhs: &'a SecretShares<T>) -> SecretShares<T> {
         let mut z = SecretShares::default();
@@ -206,7 +251,7 @@ impl <'a, 'b, T: ECScalar> Add<&'a SecretShares<T>> for &'b SecretShares<T> {
     }
 }
 
-impl <T: ECScalar> Sub<SecretShares<T>> for SecretShares<T> {
+impl<T: ECScalar> Sub<SecretShares<T>> for SecretShares<T> {
     type Output = SecretShares<T>;
     fn sub(self, rhs: SecretShares<T>) -> SecretShares<T> {
         let mut z = SecretShares::default();
@@ -217,7 +262,7 @@ impl <T: ECScalar> Sub<SecretShares<T>> for SecretShares<T> {
     }
 }
 
-impl <'a, 'b, T: ECScalar> Sub<&'a SecretShares<T>> for &'b SecretShares<T> {
+impl<'a, 'b, T: ECScalar> Sub<&'a SecretShares<T>> for &'b SecretShares<T> {
     type Output = SecretShares<T>;
     fn sub(self, rhs: &'a SecretShares<T>) -> SecretShares<T> {
         let mut z = SecretShares::default();
@@ -242,16 +287,63 @@ impl <'a, 'b, T: ECScalar> Sub<&'a SecretShares<T>> for &'b SecretShares<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ec_curve::secp256k1::scalar::ScalarElement;
+    use ec_curve::secp256k1::scalar::Secp256k1Scalar;
+
+    use bincode2;
+    use rand::thread_rng;
+    use rstest::rstest;
+    use serde_json;
+
+    use super::*;
+
+    #[test]
+    fn test_serialization_empty() {
+        // generate shares for a vector of secrets
+        let target: Share<Secp256k1Scalar> = Share::default();
+        let encoded: Vec<u8> = bincode2::serialize(&target).unwrap();
+        let decoded: Share<Secp256k1Scalar> = bincode2::deserialize(&encoded[..]).unwrap();
+        assert_eq!(target, decoded);
+    }
+
+    #[test]
+    fn test_serialization_vec_empty() {
+        // generate shares for a vector of secrets
+        let target: Vec<Share<Secp256k1Scalar>> = vec![];
+        let encoded: Vec<u8> = bincode2::serialize(&target).unwrap();
+        let decoded: Vec<Share<Secp256k1Scalar>> = bincode2::deserialize(&encoded[..]).unwrap();
+        assert_eq!(target, decoded);
+    }
+
+    #[test]
+    fn test_serialize() {
+        let mut rng = thread_rng();
+        let secret = Secp256k1Scalar::random(&mut rng);
+        let shares = crate::split(&mut rng, &secret, 3, 5);
+
+        let target: Share<Secp256k1Scalar> = shares[0].clone();
+        let encoded: Vec<u8> = bincode2::serialize(&target).unwrap();
+        let decoded: Share<Secp256k1Scalar> = bincode2::deserialize(&encoded[..]).unwrap();
+        assert_eq!(target, decoded);
+    }
 
     #[test]
     fn test_add() {
-        let scalar = ScalarElement::from_num(1);
-        let scalar_result = ScalarElement::from_num(2);
+        let scalar = Secp256k1Scalar::from_num(1);
+        let scalar_result = Secp256k1Scalar::from_num(2);
 
-        let share = Share { id: 1, threshold: 1, share_count: 1, data: scalar.clone() };
+        let share = Share {
+            id: 1,
+            threshold: 1,
+            share_count: 1,
+            data: scalar.clone(),
+        };
 
-        let expected = Share { id: 1, threshold: 1, share_count: 1, data: scalar_result.clone() };
+        let expected = Share {
+            id: 1,
+            threshold: 1,
+            share_count: 1,
+            data: scalar_result.clone(),
+        };
         let val = share + scalar;
 
         assert_eq!(val, expected, "Test addition modulo");
@@ -259,23 +351,36 @@ mod tests {
 
     #[test]
     fn test_add_secret_shares() {
-        let scalar = ScalarElement::from_num(1);
-        let scalar_result = ScalarElement::from_num(2);
+        let scalar = Secp256k1Scalar::from_num(1);
+        let scalar_result = Secp256k1Scalar::from_num(2);
 
-        let share = Share { id: 1, threshold: 1, share_count: 1, data: scalar.clone() };
+        let share = Share {
+            id: 1,
+            threshold: 1,
+            share_count: 1,
+            data: scalar.clone(),
+        };
 
-        let expected = Share { id: 1, threshold: 1, share_count: 1, data: scalar_result.clone() };
+        let expected = Share {
+            id: 1,
+            threshold: 1,
+            share_count: 1,
+            data: scalar_result.clone(),
+        };
 
         let s0 = vec![share.clone(), share.clone()];
         let s1 = vec![expected.clone(), expected.clone()];
-        let mut secret_shares: SecretShares<ScalarElement> = SecretShares::default();
-        let mut secret_shares_expected: SecretShares<ScalarElement> = SecretShares::default();
+        let mut secret_shares: SecretShares<Secp256k1Scalar> = SecretShares::default();
+        let mut secret_shares_expected: SecretShares<Secp256k1Scalar> = SecretShares::default();
         secret_shares.0 = s0;
         secret_shares_expected.0 = s1;
 
         secret_shares = secret_shares + scalar;
 
-        assert_eq!(secret_shares, secret_shares_expected, "Test addition modulo");
+        assert_eq!(
+            secret_shares, secret_shares_expected,
+            "Test addition modulo"
+        );
     }
 }
 

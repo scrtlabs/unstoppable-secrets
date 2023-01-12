@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate impl_ops;
 
+extern crate core;
 extern crate num_bigint;
 extern crate serde;
 
@@ -9,8 +10,8 @@ pub enum Error {
     InvalidCurvePoint,
     // InvalidMultiplicationResult,
     InvalidInputLength,
-    // InvalidScalar,
+    InvalidInputEncoding, // InvalidScalar,
 }
 
-pub mod traits;
 pub mod secp256k1;
+pub mod traits;

@@ -16,7 +16,7 @@ serde = { version = "1.0.152", features = ["derive"] }
 rand_core = { version = "0.6.4", default-features = false }
 
 [dev-dependencies]
-rstest = "0.16.0"
+rstest = "0.13.0"
 serde_json = "1.0.48"
-bincode = "1.2.1"
+bincode2 = "2.0.1"
 rand = "0.8.5"
