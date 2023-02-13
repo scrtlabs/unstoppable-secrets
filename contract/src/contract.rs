@@ -217,4 +217,18 @@ mod tests {
 
         assert_eq!(pk_from_chain, computed_pk);
     }
+
+    use secp256k1::hashes::sha256;
+    use secp256k1::rand::rngs::OsRng;
+    use secp256k1::{Message, Secp256k1};
+
+    #[test]
+    fn secp256k1_test() {
+        let secp = Secp256k1::new();
+        let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+        let message = Message::from_hashed_data::<sha256::Hash>("gm".as_bytes());
+
+        let sig = secp.sign_ecdsa(&message, &secret_key);
+        assert!(secp.verify_ecdsa(&message, &sig, &public_key).is_ok());
+    }
 }
