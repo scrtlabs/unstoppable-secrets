@@ -462,15 +462,15 @@ mod tests {
     }
 
     // GOAL: pure math signature works with ecdsa.verify from a common library
+    #[test]
     fn sign_and_verify_test() {
         // Generate pure math (sk, pk)
-        let mut rng = Prng::new(b"hello", silly.as_slice());
         let sk_math = Secp256k1Scalar::random(&mut OsRng);
         let pk_math = Secp256k1Point::generate(&sk_math);
 
         let message_arr = [6u8; 32];
         let message_math = Secp256k1Scalar::from_slice(&message_arr).unwrap();
-        
+
         // Generate sig = (r, s) using pure math
         let k = Secp256k1Scalar::random(&mut OsRng);
         let R = Secp256k1Point::generate(&k);
@@ -482,12 +482,12 @@ mod tests {
         };
 
         // Try to verify sig with secp256k1 verify
-        let secp256k1 = Secp256k1::new();
+        // let secp256k1 = Secp256k1::new();
         let message = Message::parse(&message_arr);
-        
+        let pk = PublicKey::parse_slice(&pk_math.to_slice(), Some(PublicKeyFormat::Raw)).unwrap();
+
         // TODO: need to turn pk_math --> PublicKey type and make it consistent.
         assert!(verify(&message, &sig, &pk));
         println!("The value of (r,s)) is {:?}", sig);
     }
-
 }
