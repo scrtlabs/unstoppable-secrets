@@ -475,10 +475,10 @@ mod tests {
         let k = Secp256k1Scalar::random(&mut OsRng);
         let R = Secp256k1Point::generate(&k);
         let r = R.x();
-        let s = (message_math + r * sk_math) * k.inv();
+        let s = (message_math + r.clone() * sk_math) * k.inv();
         let sig = Signature {
             r: r.value,
-            s: s.value
+            s: s.value,
         };
 
         // Try to verify sig with secp256k1 verify
