@@ -17,7 +17,10 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     CreateShare {
         user_index: u32,
-        shares: Vec<Share<Secp256k1Scalar>>,
+        k_user_shares: Vec<Share<Secp256k1Scalar>>,
+        a_user_shares: Vec<Share<Secp256k1Scalar>>,
+        user_zero_shares1: Vec<Share<Secp256k1Scalar>>,
+        user_zero_shares2: Vec<Share<Secp256k1Scalar>>,
         public_key: String,
     },
 }
@@ -55,7 +58,13 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct ReadShareResponse {
-    pub(crate) user_share: Share<Secp256k1Scalar>,
-    pub(crate) chain_share: Share<Secp256k1Scalar>,
+    pub(crate) k_user_share: Share<Secp256k1Scalar>,
+    pub(crate) k_chain_share: Share<Secp256k1Scalar>,
     pub(crate) public_key: String,
+    pub(crate) a_user_share: Share<Secp256k1Scalar>,
+    pub(crate) a_chain_share: Share<Secp256k1Scalar>,
+    pub(crate) user_zero_share1: Share<Secp256k1Scalar>,
+    pub(crate) user_zero_share2: Share<Secp256k1Scalar>,
+    pub(crate) chain_zero_share1: Share<Secp256k1Scalar>,
+    pub(crate) chain_zero_share2: Share<Secp256k1Scalar>
 }

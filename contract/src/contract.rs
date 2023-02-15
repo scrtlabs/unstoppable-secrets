@@ -35,8 +35,8 @@ pub fn execute(
 ) -> Result<Response, CustomContractError> {
     match msg {
         ExecuteMsg::CreateShare {
-            public_key, shares, ..
-        } => create_share(deps, env, info, public_key, shares),
+            public_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2, ..
+        } => create_share(deps, env, info, public_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2),
     }
 }
 
@@ -45,15 +45,42 @@ fn create_share(
     env: Env,
     _info: MessageInfo,
     user_public_key: String,
-    user_shares: Vec<Share<Secp256k1Scalar>>,
+    k_user_shares: Vec<Share<Secp256k1Scalar>>,
+    a_user_shares: Vec<Share<Secp256k1Scalar>>,
+    user_zero_shares1: Vec<Share<Secp256k1Scalar>>,
+    user_zero_shares2: Vec<Share<Secp256k1Scalar>>,
 ) -> Result<Response, CustomContractError> {
     let mut state = load_state(deps.storage)?;
     let total_shares = state.num_of_users + state.threshold;
 
-    if user_shares.len() != total_shares as usize {
+    if k_user_shares.len() != total_shares as usize {
         return Err(CustomContractError::Std(StdError::generic_err(format!(
             "Wrong number of user shares provided: {} vs expected: {}",
-            user_shares.len(),
+            k_user_shares.len(),
+            total_shares
+        ))));
+    }
+
+    if a_user_shares.len() != total_shares as usize {
+        return Err(CustomContractError::Std(StdError::generic_err(format!(
+            "Wrong number of user shares provided: {} vs expected: {}",
+            a_user_shares.len(),
+            total_shares
+        ))));
+    }
+
+    if user_zero_shares1.len() != total_shares as usize {
+        return Err(CustomContractError::Std(StdError::generic_err(format!(
+            "Wrong number of user shares provided: {} vs expected: {}",
+            user_zero_shares1.len(),
+            total_shares
+        ))));
+    }
+
+    if user_zero_shares2.len() != total_shares as usize {
+        return Err(CustomContractError::Std(StdError::generic_err(format!(
+            "Wrong number of user shares provided: {} vs expected: {}",
+            user_zero_shares2.len(),
             total_shares
         ))));
     }
@@ -64,32 +91,59 @@ fn create_share(
     // let rng = Prng::new(rand.as_slice(), b"");
     let silly = env.block.time.nanos().to_be_bytes();
     let mut rng = Prng::new(b"hello", silly.as_slice());
-    let secret_key = Secp256k1Scalar::random(&mut rng);
+    let k_chain = Secp256k1Scalar::random(&mut rng);
+    let a_chain = Secp256k1Scalar::random(&mut rng);
 
     // generate chain public key
-    let chain_public_key = Secp256k1Point::generate(&secret_key);
+    let chain_public_key = Secp256k1Point::generate(&k_chain);
 
     // Calculate sum of public keys
     let user_pk = Secp256k1Point::from_str(&user_public_key)
         .map_err(|_| StdError::generic_err("Failed to decode user public key"))?;
     state.public_key = user_pk + chain_public_key;
 
-    let chain_shares = scrt_sss::split(&mut rng, &secret_key, state.threshold, total_shares);
+    let k_chain_shares = scrt_sss::split(&mut rng, &k_chain, state.threshold, total_shares);
+    let a_chain_shares = scrt_sss::split(&mut rng, &k_chain, state.threshold, total_shares);
+    let chain_zero_shares1 = scrt_sss::split(&mut rng, &Secp256k1Scalar::zero(), state.threshold*2, total_shares);
+    let chain_zero_shares2 = scrt_sss::split(&mut rng, &Secp256k1Scalar::zero(), state.threshold*2, total_shares);
 
-    // what's this and why are we computing it?
-    let mut chain_shares_final = vec![];
+    // Chain has the last 't' shares. Compute over them
+    let mut k_chain_shares_final = vec![];
+    let mut a_chain_shares_final = vec![];
+    let mut chain_zero_shares_final1 = vec![];
+    let mut chain_zero_shares_final2 = vec![];
     for i in state.num_of_users..total_shares {
-        chain_shares_final
-            .push(user_shares.get((i) as usize).unwrap() + chain_shares.get(i as usize).unwrap())
+        k_chain_shares_final
+            .push(k_user_shares.get((i) as usize).unwrap() + k_chain_shares.get(i as usize).unwrap());
+        a_chain_shares_final
+            .push(a_user_shares.get((i) as usize).unwrap() + k_chain_shares.get(i as usize).unwrap());
+        chain_zero_shares_final1
+            .push(user_zero_shares1.get((i) as usize).unwrap() + chain_zero_shares1.get(i as usize).unwrap());
+        chain_zero_shares_final2
+            .push(user_zero_shares2.get((i) as usize).unwrap() + chain_zero_shares2.get(i as usize).unwrap());
     }
 
-    state.user_generated_shares = user_shares;
-    state.chain_generated_shares = chain_shares;
-    state.chain_generated_final = chain_shares_final;
+    // Store all to state so everyone can retreive later..
+
+    state.k_user_shares = k_user_shares;
+    state.k_chain_shares = k_chain_shares;
+    state.k_chain_shares_final = k_chain_shares_final;
+
+    state.a_user_shares = a_user_shares;
+    state.a_chain_shares = a_chain_shares;
+    state.a_chain_shares_final = a_chain_shares_final;
+
+    state.user_zero_shares1 = user_zero_shares1;
+    state.chain_zero_shares1 = chain_zero_shares1;
+    state.chain_zero_shares_final1 = chain_zero_shares_final1;
+
+    state.user_zero_shares2 = user_zero_shares2;
+    state.chain_zero_shares2 = chain_zero_shares2;
+    state.chain_zero_shares_final2 = chain_zero_shares_final2;
 
     #[cfg(test)]
     {
-        state.chain_private_key = secret_key;
+        state.chain_private_key = k_chain;
     }
 
     save_state(deps.storage, state)?;
@@ -104,17 +158,47 @@ fn read_share(deps: Deps, _env: Env, user_index: u32) -> StdResult<ReadShareResp
     // read the shares from state
 
     return Ok(ReadShareResponse {
-        user_share: state
-            .user_generated_shares
+        k_user_share: state
+            .k_user_shares
             .get(user_index as usize)
             .unwrap()
             .clone(),
-        chain_share: state
-            .chain_generated_shares
+        k_chain_share: state
+            .k_chain_shares
             .get(user_index as usize)
             .unwrap()
             .clone(),
         public_key: state.public_key.to_string(),
+        a_user_share: state
+            .a_user_shares
+            .get(user_index as usize)
+            .unwrap()
+            .clone(),
+        a_chain_share: state
+            .a_chain_shares
+            .get(user_index as usize)
+            .unwrap()
+            .clone(),
+        user_zero_share1: state
+            .user_zero_shares1
+            .get(user_index as usize)
+            .unwrap()
+            .clone(),
+        chain_zero_share1: state
+            .chain_zero_shares1
+            .get(user_index as usize)
+            .unwrap()
+            .clone(),
+        user_zero_share2: state
+            .user_zero_shares2
+            .get(user_index as usize)
+            .unwrap()
+            .clone(),
+        chain_zero_share2: state
+            .chain_zero_shares2
+            .get(user_index as usize)
+            .unwrap()
+            .clone(),
     });
 }
 
@@ -155,21 +239,57 @@ mod tests {
         info
     }
 
+    fn client_create_share_helper(
+        num_of_shares: u8,
+        threshold: u8,
+        compute_public: bool,
+        compute_secret: bool,
+    ) -> (Vec<Share<Secp256k1Scalar>>, Option<Secp256k1Scalar>, Option<Secp256k1Point>) {
+        let mut rng = rand::thread_rng();
+    
+        let secret = if compute_secret {
+            Some(Secp256k1Scalar::random(&mut rng))
+        } else {
+            Some(Secp256k1Scalar::zero())
+        };
+    
+        let public = if compute_public {
+            Some(Secp256k1Point::generate(secret.as_ref().unwrap()))
+        } else {
+            None
+        };
+    
+        let shares = scrt_sss::split(&mut rng, secret.as_ref().unwrap(), threshold, num_of_shares);
+    
+        return (shares, secret, public);
+    }
+    
     fn client_create_share(
         num_of_shares: u8,
         threshold: u8,
     ) -> (Vec<Share<Secp256k1Scalar>>, Secp256k1Scalar, Secp256k1Point) {
-        let mut rng = rand::thread_rng();
-
-        let secret = Secp256k1Scalar::random(&mut rng);
-        let public = Secp256k1Point::generate(&secret);
-
-        let shares = scrt_sss::split(&mut rng, &secret, threshold, num_of_shares);
-
-        return (shares, secret, public);
+        let (shares, secret, public) = client_create_share_helper(num_of_shares, threshold, true, true);
+        return (shares, secret.unwrap(), public.unwrap());
     }
+    
+    fn client_create_share_no_public(
+        num_of_shares: u8,
+        threshold: u8,
+    ) -> (Vec<Share<Secp256k1Scalar>>, Secp256k1Scalar) {
+        let (shares, secret, _) = client_create_share_helper(num_of_shares, threshold, false, true);
+        return (shares, secret.unwrap());
+    }
+    
+    fn client_create_share_no_secret(
+        num_of_shares: u8,
+        threshold: u8,
+    ) -> Vec<Share<Secp256k1Scalar>> {
+        let (shares, _, _) = client_create_share_helper(num_of_shares, threshold, false, false);
+        return shares;
+    }    
 
     #[test]
+    // #[cfg(feature = "rand-std")]
     fn execute_test() {
         let mut deps = mock_dependencies();
 
@@ -179,17 +299,39 @@ mod tests {
         // 5 users: 8 shares
         let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
 
-        let (shares, user_secret, public) = client_create_share(total_shares, threshold);
+        // TODO: KeyGen
+        let (sk_shares, sk, pk) = client_create_share(total_shares, threshold);
+
+        // Generate 4 values and their shares: k_user, a_user, 0, 0
+        let (k_user_shares, k_user, k_user_public) = client_create_share(total_shares, threshold);
+        let (a_user_shares, a_user) = client_create_share_no_public(total_shares, threshold);
+        let user_zero_shares1 = client_create_share_no_secret(total_shares, threshold*2);
+        let user_zero_shares2 = client_create_share_no_secret(total_shares, threshold*2);
+
         let msg = ExecuteMsg::CreateShare {
             user_index: 0,
-            shares,
-            public_key: public.to_string(),
+            k_user_shares: k_user_shares,
+            a_user_shares: a_user_shares,
+            user_zero_shares1: user_zero_shares1,
+            user_zero_shares2: user_zero_shares2,
+            public_key: k_user_public.to_string(),
         };
+
         let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let mut new_shares = vec![];
+        // Get all values..
+        let mut k_shares = vec![];
+        let mut a_shares = vec![];
+        let mut zero_shares1 = vec![];
+        let mut zero_shares2 = vec![];
+        let mut sig_num = vec![];
+        let mut sig_denom = vec![];
         let mut pk_from_chain = Secp256k1Point::default();
-        for i in 0..=threshold {
+        // let m = Secp256k1Scalar::from_str("24234");
+        // let m = Secp256k1Scalar::one();
+        let num = [0u8; 32];
+        let m = Secp256k1Scalar::from_slice(&num).unwrap();
+        for i in 0..=2*threshold {
             // read shares for each party
 
             let msg = QueryMsg::ReadShare {
@@ -199,22 +341,153 @@ mod tests {
 
             let decoded_response: ReadShareResponse = from_binary(&resp).unwrap();
 
-            let new_share = decoded_response.user_share + decoded_response.chain_share;
+            let k_share = decoded_response.k_user_share + decoded_response.k_chain_share;
+            let a_share = decoded_response.a_user_share + decoded_response.a_chain_share;
+            let zero_share1 = decoded_response.user_zero_share1 + decoded_response.chain_zero_share1;
+            let zero_share2 = decoded_response.user_zero_share2 + decoded_response.chain_zero_share2;
 
             pk_from_chain = Secp256k1Point::from_str(&decoded_response.public_key).unwrap();
+            let r = pk_from_chain.x();
 
-            new_shares.push(new_share);
+
+            let k_copy = k_share.clone();
+            let a_copy = a_share.clone();
+            let a_copy2 = a_share.clone();
+            let zero1_copy = zero_share1.clone();
+            let zero2_copy = zero_share2.clone();
+
+            k_shares.push(k_share);
+            a_shares.push(a_share);
+            zero_shares1.push(zero_share1);
+            zero_shares2.push(zero_share2);
+            
+            let sk_share = sk_shares
+            .get(i as usize)
+            .unwrap()
+            .clone();
+
+            sig_num.push(a_copy * (m.clone() + (r * sk_share.data)) - zero1_copy);
+            sig_denom.push(k_copy * a_copy2.data - zero2_copy);
         }
 
-        let recovered = scrt_sss::open(new_shares).unwrap();
+        let s1 = scrt_sss::open(sig_num).unwrap();
+        let s2 = scrt_sss::open(sig_denom).unwrap();
+        let s = s1*s2;
+        println!("The value of s is {:?}", s.to_hex());
+
+        let recovered = scrt_sss::open(k_shares).unwrap();
 
         let msg = QueryMsg::TestReadSecret {};
         let chain_secret: Secp256k1Scalar =
             from_binary(&query(deps.as_ref(), mock_env(), msg).unwrap()).unwrap();
-        assert_eq!(recovered, (chain_secret + user_secret));
 
+        let user_secret_copy = k_user.clone();
+        let chain_secret_copy = chain_secret.clone();
+        assert_eq!(recovered, (chain_secret + k_user));
         let computed_pk = Secp256k1Point::generate(&recovered);
-
         assert_eq!(pk_from_chain, computed_pk);
+
+        let recovered = scrt_sss::open(zero_shares1).unwrap();
+        assert_eq!(recovered, Secp256k1Scalar::zero());
+        let recovered = scrt_sss::open(zero_shares2).unwrap();
+        assert_eq!(recovered, Secp256k1Scalar::zero());
+
     }
+
+    // #[test]
+    // fn encoding_test() {
+    //     let sk_libsecp = SecretKey::default();
+    //     let two = &[
+    //         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    //         0x00, 0x0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    //         0x00, 0x00, 0x00, 0x02,
+    //     ];
+    //     let sk_libsecp2 = SecretKey::parse(&two).unwrap();
+    //     let pk_libsecp = PublicKey::from_secret_key(&sk_libsecp);
+    //     let pk_libsecp2 = PublicKey::from_secret_key(&sk_libsecp2);
+    //     let num = [0u8; 32];
+    //     let m = Secp256k1Scalar::from_slice(&num).unwrap();
+    //     let message = Message::parse(&m.to_raw());
+
+    //     println!("The value of m is {:?}", m);
+    //     println!("The value of message is {:?}", message);
+    //     // println!("The value of sk is {:?}", sk);
+    //     println!("The value of sk_libsecp is {:?}", sk_libsecp);
+    //     println!("The value of pk_libsecp is {:?}", pk_libsecp);
+    //     println!("The value of sk_libsecp2 is {:?}", sk_libsecp2);
+    //     println!("The value of pk_libsecp2 is {:?}", pk_libsecp2);
+    //     println!("The value of sk_libsecp2 is {:?}", sk_libsecp2.serialize());
+    //     println!("The value of pk_libsecp2 is {:?}", pk_libsecp2.serialize());
+    //     // println!("The value of sig is {:?}", sig);
+    //     // assert!(verify(&message, &sig, &pk_libsecp));
+    // }
+
+    use secp256k1::hashes::sha256;
+    use secp256k1::rand::rngs::OsRng;
+    use secp256k1::{Message as SecpMessage, Secp256k1};
+
+    #[test]
+    fn secp256k1_test() {
+        let secp = Secp256k1::new();
+        let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+        let message = SecpMessage::from_hashed_data::<sha256::Hash>("gm".as_bytes());
+
+        let sig = secp.sign_ecdsa(&message, &secret_key);
+        assert!(secp.verify_ecdsa(&message, &sig, &public_key).is_ok());
+    }
+
+    use libsecp256k1::*;
+    #[test]
+    fn libsecp256k1_test() {
+        let secp256k1 = Secp256k1::new();
+
+        let message_arr = [6u8; 32];
+        let (secp_privkey, secp_pubkey) = secp256k1.generate_keypair(&mut OsRng);
+        let pubkey_a = secp_pubkey.serialize_uncompressed();
+        assert_eq!(pubkey_a.len(), 65);
+        let pubkey = PublicKey::parse(&pubkey_a).unwrap();
+        let mut seckey_a = [0u8; 32];
+        for i in 0..32 {
+            seckey_a[i] = secp_privkey[i];
+        }
+        
+        let message = Message::parse(&message_arr);
+
+        let seckey = SecretKey::parse(&seckey_a).unwrap();
+        let (sig, recid) = sign(&message, &seckey);
+
+        // Self verify
+        assert!(verify(&message, &sig, &pubkey));
+        println!("The value of (r,s)) is {:?}", sig);
+    }
+
+    // GOAL: pure math signature works with ecdsa.verify from a common library
+    fn sign_and_verify_test() {
+        // Generate pure math (sk, pk)
+        let mut rng = Prng::new(b"hello", silly.as_slice());
+        let sk_math = Secp256k1Scalar::random(&mut OsRng);
+        let pk_math = Secp256k1Point::generate(&sk_math);
+
+        let message_arr = [6u8; 32];
+        let message_math = Secp256k1Scalar::from_slice(&message_arr).unwrap();
+        
+        // Generate sig = (r, s) using pure math
+        let k = Secp256k1Scalar::random(&mut OsRng);
+        let R = Secp256k1Point::generate(&k);
+        let r = R.x();
+        let s = (message_math + r * sk_math) * k.inv();
+        let sig = Signature {
+            r: r.value,
+            s: s.value
+        };
+
+        // Try to verify sig with secp256k1 verify
+        let secp256k1 = Secp256k1::new();
+        let message = Message::parse(&message_arr);
+        
+        // TODO: need to turn pk_math --> PublicKey type and make it consistent.
+        assert!(verify(&message, &sig, &pk));
+        println!("The value of (r,s)) is {:?}", sig);
+    }
+
 }

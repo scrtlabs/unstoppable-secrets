@@ -28,11 +28,25 @@ pub fn load_state(storage: &dyn Storage) -> StdResult<State> {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct State {
-    /// r1
-    pub user_generated_shares: Vec<Share<Secp256k1Scalar>>,
-    pub chain_generated_shares: Vec<Share<Secp256k1Scalar>>,
-    pub chain_generated_final: Vec<Share<Secp256k1Scalar>>,
+    // k, R=k*G (instance key pair)
+    pub k_chain_shares: Vec<Share<Secp256k1Scalar>>,
+    pub k_user_shares: Vec<Share<Secp256k1Scalar>>,
+    pub k_chain_shares_final: Vec<Share<Secp256k1Scalar>>,
     pub public_key: Secp256k1Point,
+
+    // a (random value)
+    pub a_chain_shares: Vec<Share<Secp256k1Scalar>>,
+    pub a_user_shares: Vec<Share<Secp256k1Scalar>>,
+    pub a_chain_shares_final: Vec<Share<Secp256k1Scalar>>,
+
+    // zero values
+    pub chain_zero_shares1: Vec<Share<Secp256k1Scalar>>,
+    pub chain_zero_shares2: Vec<Share<Secp256k1Scalar>>,
+    pub user_zero_shares1: Vec<Share<Secp256k1Scalar>>,
+    pub user_zero_shares2: Vec<Share<Secp256k1Scalar>>,
+
+    pub chain_zero_shares_final1: Vec<Share<Secp256k1Scalar>>,
+    pub chain_zero_shares_final2: Vec<Share<Secp256k1Scalar>>,
 
     pub num_of_users: u8,
     pub threshold: u8,
