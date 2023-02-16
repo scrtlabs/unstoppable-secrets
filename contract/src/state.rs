@@ -32,7 +32,7 @@ pub struct State {
     pub k_chain_shares: Vec<Share<Secp256k1Scalar>>,
     pub k_user_shares: Vec<Share<Secp256k1Scalar>>,
     pub k_chain_shares_final: Vec<Share<Secp256k1Scalar>>,
-    pub public_key: Secp256k1Point,
+    pub public_instance_key: Secp256k1Point,
 
     // a (random value)
     pub a_chain_shares: Vec<Share<Secp256k1Scalar>>,
@@ -52,5 +52,5 @@ pub struct State {
     pub threshold: u8,
 
     #[cfg(test)]
-    pub chain_private_key: Secp256k1Scalar,
+    pub chain_private_instance_key: Secp256k1Scalar,
 }

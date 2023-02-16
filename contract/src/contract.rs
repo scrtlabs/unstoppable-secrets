@@ -5,7 +5,7 @@ use cosmwasm_std::{
 
 use scrt_sss::{ECPoint, ECScalar, Secp256k1Point, Secp256k1Scalar, Share};
 
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReadShareResponse};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReadPresigResponse};
 use crate::rng::Prng;
 use crate::state::{load_state, save_state, State};
 
@@ -34,17 +34,17 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, CustomContractError> {
     match msg {
-        ExecuteMsg::CreateShare {
-            public_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2, ..
-        } => create_share(deps, env, info, public_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2),
+        ExecuteMsg::CreatePresig {
+            public_instance_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2, ..
+        } => create_presig(deps, env, info, public_instance_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2),
     }
 }
 
-fn create_share(
+fn create_presig(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
-    user_public_key: String,
+    user_public_instance_key: String,
     k_user_shares: Vec<Share<Secp256k1Scalar>>,
     a_user_shares: Vec<Share<Secp256k1Scalar>>,
     user_zero_shares1: Vec<Share<Secp256k1Scalar>>,
@@ -95,12 +95,12 @@ fn create_share(
     let a_chain = Secp256k1Scalar::random(&mut rng);
 
     // generate chain public key
-    let chain_public_key = Secp256k1Point::generate(&k_chain);
+    let chain_public_instance_key = Secp256k1Point::generate(&k_chain);
 
     // Calculate sum of public keys
-    let user_pk = Secp256k1Point::from_str(&user_public_key)
+    let user_pk = Secp256k1Point::from_str(&user_public_instance_key)
         .map_err(|_| StdError::generic_err("Failed to decode user public key"))?;
-    state.public_key = user_pk + chain_public_key;
+    state.public_instance_key = user_pk + chain_public_instance_key;
 
     let k_chain_shares = scrt_sss::split(&mut rng, &k_chain, state.threshold, total_shares);
     let a_chain_shares = scrt_sss::split(&mut rng, &a_chain, state.threshold, total_shares);
@@ -143,7 +143,7 @@ fn create_share(
 
     #[cfg(test)]
     {
-        state.chain_private_key = k_chain;
+        state.chain_private_instance_key = k_chain;
     }
 
     save_state(deps.storage, state)?;
@@ -151,13 +151,13 @@ fn create_share(
     Ok(Response::default())
 }
 
-fn read_share(deps: Deps, _env: Env, user_index: u32) -> StdResult<ReadShareResponse> {
+fn read_presig(deps: Deps, _env: Env, user_index: u32) -> StdResult<ReadPresigResponse> {
     // todo: authentication
     let state = load_state(deps.storage)?;
 
     // read the shares from state
 
-    return Ok(ReadShareResponse {
+    return Ok(ReadPresigResponse {
         k_user_share: state
             .k_user_shares
             .get(user_index as usize)
@@ -168,7 +168,7 @@ fn read_share(deps: Deps, _env: Env, user_index: u32) -> StdResult<ReadShareResp
             .get(user_index as usize)
             .unwrap()
             .clone(),
-        public_key: state.public_key.to_string(),
+        public_instance_key: state.public_instance_key.to_string(),
         a_user_share: state
             .a_user_shares
             .get(user_index as usize)
@@ -203,21 +203,21 @@ fn read_share(deps: Deps, _env: Env, user_index: u32) -> StdResult<ReadShareResp
 }
 
 #[cfg(test)]
-fn test_read_secret(deps: Deps) -> StdResult<Secp256k1Scalar> {
+fn test_read_instance_secret(deps: Deps) -> StdResult<Secp256k1Scalar> {
     // todo: authentication
     let state = load_state(deps.storage)?;
 
     // read the shares from state
 
-    return Ok(state.chain_private_key);
+    return Ok(state.chain_private_instance_key);
 }
 
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::ReadShare { user_index } => to_binary(&read_share(deps, env, user_index)?),
+        QueryMsg::ReadPresig { user_index } => to_binary(&read_presig(deps, env, user_index)?),
         #[cfg(test)]
-        QueryMsg::TestReadSecret {} => to_binary(&test_read_secret(deps)?),
+        QueryMsg::TestReadInstanceSecret {} => to_binary(&test_read_instance_secret(deps)?),
     }
 }
 
@@ -308,13 +308,13 @@ mod tests {
         let user_zero_shares1 = client_create_share_no_secret(total_shares, threshold*2);
         let user_zero_shares2 = client_create_share_no_secret(total_shares, threshold*2);
 
-        let msg = ExecuteMsg::CreateShare {
+        let msg = ExecuteMsg::CreatePresig {
             user_index: 0,
             k_user_shares: k_user_shares,
             a_user_shares: a_user_shares,
             user_zero_shares1: user_zero_shares1,
             user_zero_shares2: user_zero_shares2,
-            public_key: k_user_public.to_string(),
+            public_instance_key: k_user_public.to_string(),
         };
 
         let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
@@ -334,19 +334,19 @@ mod tests {
         for i in 0..=num_of_shares {
             // read shares for each party
 
-            let msg = QueryMsg::ReadShare {
+            let msg = QueryMsg::ReadPresig {
                 user_index: i as u32,
             };
             let resp = query(deps.as_ref(), mock_env(), msg).unwrap();
 
-            let decoded_response: ReadShareResponse = from_binary(&resp).unwrap();
+            let decoded_response: ReadPresigResponse = from_binary(&resp).unwrap();
 
             let k_share = decoded_response.k_user_share + decoded_response.k_chain_share;
             let a_share = decoded_response.a_user_share + decoded_response.a_chain_share;
             let zero_share1 = decoded_response.user_zero_share1 + decoded_response.chain_zero_share1;
             let zero_share2 = decoded_response.user_zero_share2 + decoded_response.chain_zero_share2;
 
-            pk_from_chain = Secp256k1Point::from_str(&decoded_response.public_key).unwrap();
+            pk_from_chain = Secp256k1Point::from_str(&decoded_response.public_instance_key).unwrap();
             let r = pk_from_chain.x();
 
 
@@ -379,7 +379,7 @@ mod tests {
         // Test all values reconstruct to values that make sense
         let recovered = k.clone();
 
-        let msg = QueryMsg::TestReadSecret {};
+        let msg = QueryMsg::TestReadInstanceSecret {};
         let chain_secret: Secp256k1Scalar =
             from_binary(&query(deps.as_ref(), mock_env(), msg).unwrap()).unwrap();
 
@@ -426,34 +426,6 @@ mod tests {
         println!("MPC sig verified successfully!");
 
     }
-
-    // #[test]
-    // fn encoding_test() {
-    //     let sk_libsecp = SecretKey::default();
-    //     let two = &[
-    //         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    //         0x00, 0x0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    //         0x00, 0x00, 0x00, 0x02,
-    //     ];
-    //     let sk_libsecp2 = SecretKey::parse(&two).unwrap();
-    //     let pk_libsecp = PublicKey::from_secret_key(&sk_libsecp);
-    //     let pk_libsecp2 = PublicKey::from_secret_key(&sk_libsecp2);
-    //     let num = [0u8; 32];
-    //     let m = Secp256k1Scalar::from_slice(&num).unwrap();
-    //     let message = Message::parse(&m.to_raw());
-
-    //     println!("The value of m is {:?}", m);
-    //     println!("The value of message is {:?}", message);
-    //     // println!("The value of sk is {:?}", sk);
-    //     println!("The value of sk_libsecp is {:?}", sk_libsecp);
-    //     println!("The value of pk_libsecp is {:?}", pk_libsecp);
-    //     println!("The value of sk_libsecp2 is {:?}", sk_libsecp2);
-    //     println!("The value of pk_libsecp2 is {:?}", pk_libsecp2);
-    //     println!("The value of sk_libsecp2 is {:?}", sk_libsecp2.serialize());
-    //     println!("The value of pk_libsecp2 is {:?}", pk_libsecp2.serialize());
-    //     // println!("The value of sig is {:?}", sig);
-    //     // assert!(verify(&message, &sig, &pk_libsecp));
-    // }
 
     use secp256k1::hashes::sha256;
     use secp256k1::rand::rngs::OsRng;

@@ -15,19 +15,19 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    CreateShare {
+    CreatePresig {
         user_index: u32,
         k_user_shares: Vec<Share<Secp256k1Scalar>>,
         a_user_shares: Vec<Share<Secp256k1Scalar>>,
         user_zero_shares1: Vec<Share<Secp256k1Scalar>>,
         user_zero_shares2: Vec<Share<Secp256k1Scalar>>,
-        public_key: String,
+        public_instance_key: String,
     },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub struct CreateShareResponse {
+pub struct CreatePresigResponse {
     result: Status,
 }
 
@@ -50,17 +50,17 @@ pub enum Status {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// User that wants to read their share (todo: authentication)
-    ReadShare { user_index: u32 },
+    ReadPresig { user_index: u32 },
     #[cfg(test)]
-    TestReadSecret {},
+    TestReadInstanceSecret {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub struct ReadShareResponse {
+pub struct ReadPresigResponse {
     pub(crate) k_user_share: Share<Secp256k1Scalar>,
     pub(crate) k_chain_share: Share<Secp256k1Scalar>,
-    pub(crate) public_key: String,
+    pub(crate) public_instance_key: String,
     pub(crate) a_user_share: Share<Secp256k1Scalar>,
     pub(crate) a_chain_share: Share<Secp256k1Scalar>,
     pub(crate) user_zero_share1: Share<Secp256k1Scalar>,
