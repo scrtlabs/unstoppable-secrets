@@ -294,7 +294,7 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let num_of_shares = 7u8;
-        let threshold = 4u8;
+        let threshold = 2u8;
         let total_shares = num_of_shares + threshold;
         // 5 users: 8 shares
         let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
@@ -327,11 +327,11 @@ mod tests {
         let mut sig_num = vec![];
         let mut sig_denom = vec![];
         let mut pk_from_chain = Secp256k1Point::default();
-        // let m = Secp256k1Scalar::from_str("24234");
-        // let m = Secp256k1Scalar::one();
-        let num = [0u8; 32];
-        let m = Secp256k1Scalar::from_slice(&num).unwrap();
-        for i in 0..=2*threshold {
+
+        let message_arr = [6u8; 32];
+        let m = Secp256k1Scalar::from_slice(&message_arr).unwrap();
+        // for i in 0..=2*threshold {
+        for i in 0..=num_of_shares {
             // read shares for each party
 
             let msg = QueryMsg::ReadShare {
@@ -366,23 +366,23 @@ mod tests {
             .unwrap()
             .clone();
 
-            sig_num.push(a_copy * (m.clone() + (r * sk_share.data)) - zero1_copy);
-            sig_denom.push(k_copy * a_copy2.data - zero2_copy);
+            let sig_num_share = a_copy * (m.clone() + (r * sk_share.data)) - zero1_copy;
+            let sig_denom_share = k_copy * a_copy2.data - zero2_copy;
+            println!("Shares ids are: {:?}, {:?}, {:?}", sk_share.id, sig_num_share.id, sig_denom_share.id);
+            sig_num.push(sig_num_share);
+            sig_denom.push(sig_denom_share);
         }
+        let k = scrt_sss::open(k_shares).unwrap();
+        let a = scrt_sss::open(a_shares).unwrap();
+        let r = pk_from_chain.x();
 
-        let s1 = scrt_sss::open(sig_num).unwrap();
-        let s2 = scrt_sss::open(sig_denom).unwrap();
-        let s = s1*s2;
-        println!("The value of s is {:?}", s.to_hex());
-
-        let recovered = scrt_sss::open(k_shares).unwrap();
+        // Test all values reconstruct to values that make sense
+        let recovered = k.clone();
 
         let msg = QueryMsg::TestReadSecret {};
         let chain_secret: Secp256k1Scalar =
             from_binary(&query(deps.as_ref(), mock_env(), msg).unwrap()).unwrap();
 
-        let user_secret_copy = k_user.clone();
-        let chain_secret_copy = chain_secret.clone();
         assert_eq!(recovered, (chain_secret + k_user));
         let computed_pk = Secp256k1Point::generate(&recovered);
         assert_eq!(pk_from_chain, computed_pk);
@@ -391,6 +391,39 @@ mod tests {
         assert_eq!(recovered, Secp256k1Scalar::zero());
         let recovered = scrt_sss::open(zero_shares2).unwrap();
         assert_eq!(recovered, Secp256k1Scalar::zero());
+
+        let recovered = scrt_sss::open(sig_num.clone()).unwrap();
+        let ref_val = (m.clone() + r.clone() * sk.clone()) * a.clone();
+        assert_eq!(recovered, ref_val);
+
+        let recovered = scrt_sss::open(sig_denom.clone()).unwrap();
+        let ref_val = a.clone()*k.clone();
+        assert_eq!(recovered, ref_val);
+
+        // Test a local (non MPC) sig
+        let message = Message::parse(&message_arr);
+        let s = (m + r.clone() * sk) * k.inv();
+        println!("The value of s is {:?}", s.to_hex());
+
+        let sig = Signature {
+            r: r.value,
+            s: s.value,
+        };
+        let pk_lib = PublicKey::parse_slice(&pk.to_slice(), Some(PublicKeyFormat::Raw)).unwrap();
+        assert!(verify(&message, &sig, &pk_lib));
+        println!("Non MPC sig verify passed successfully!");
+
+        let s1 = scrt_sss::open(sig_num).unwrap();
+        let s2 = scrt_sss::open(sig_denom).unwrap();
+        let s = s1*s2.inv();
+        println!("The value of s is {:?}", s.to_hex());
+
+        let sig = Signature {
+            r: r.value,
+            s: s.value,
+        };
+        assert!(verify(&message, &sig, &pk_lib));
+        println!("MPC sig verified successfully!");
 
     }
 
@@ -486,7 +519,6 @@ mod tests {
         let message = Message::parse(&message_arr);
         let pk = PublicKey::parse_slice(&pk_math.to_slice(), Some(PublicKeyFormat::Raw)).unwrap();
 
-        // TODO: need to turn pk_math --> PublicKey type and make it consistent.
         assert!(verify(&message, &sig, &pk));
         println!("The value of (r,s)) is {:?}", sig);
     }
