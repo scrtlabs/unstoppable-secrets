@@ -3,6 +3,7 @@ use cosmwasm_std::{
     entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
 };
 
+use libsecp256k1::{PublicKey, PublicKeyFormat, Signature};
 use scrt_sss::{ECPoint, ECScalar, Secp256k1Point, Secp256k1Scalar, Share};
 
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReadKeyGenResponse, ReadPresigResponse};
@@ -286,15 +287,34 @@ fn execute_sign(
     let s = s1*s2.inv();
     // println!("The value of s is {:?}", s.to_hex());
 
-    /////////////
-    // TODO: FIX HERE
-    // TODO: need to take message_arr (byte array - might already work), sig = (r: , s), and public_key: Secp256k1Point and make them work with deps.api.secp256k1_verify
-    /////////////
-    
-    // TODO: save sig?
-    save_state(deps.storage, state)?;
+    // for mesasge hash we can just use message_arr here, but I want to test if
+    // to_raw() is the oposite of Secp256k1Scalar::from_slice(), e.g.:
+    // Secp256k1Scalar::from_slice(&message_arr).unwrap().to_raw()
 
-    Ok(Response::default())
+    let msg_hash_for_precompiled = &m.to_raw();
+    let sig_for_precompiled = &Signature {
+        r: r.value,
+        s: s.value,
+    }
+    .serialize();
+    let pk_for_precompiled =
+        &PublicKey::parse_slice(&state.public_key.to_slice(), Some(PublicKeyFormat::Raw))
+            .unwrap()
+            .serialize_compressed();
+
+    let is_verified = deps
+        .api
+        .secp256k1_verify(
+            msg_hash_for_precompiled,
+            sig_for_precompiled,
+            pk_for_precompiled,
+        )
+        .unwrap();
+
+    // TODO: save sig?
+    // save_state(deps.storage, state)?;
+
+    Ok(Response::default().add_attribute("is_verified", format!("{}", is_verified)))
 }
 
 fn read_keygen(deps: Deps, _env: Env, user_index: u32) -> StdResult<ReadKeyGenResponse> {
