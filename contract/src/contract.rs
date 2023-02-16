@@ -5,7 +5,7 @@ use cosmwasm_std::{
 
 use scrt_sss::{ECPoint, ECScalar, Secp256k1Point, Secp256k1Scalar, Share};
 
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReadPresigResponse};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReadKeyGenResponse, ReadPresigResponse};
 use crate::rng::Prng;
 use crate::state::{load_state, save_state, State};
 
@@ -37,7 +37,63 @@ pub fn execute(
         ExecuteMsg::CreatePresig {
             public_instance_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2, ..
         } => create_presig(deps, env, info, public_instance_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2),
+        ExecuteMsg::KeyGen {
+            user_public_key, user_secret_key_shares, ..
+        } => keygen(deps, env, info, user_public_key, user_secret_key_shares),
     }
+}
+
+fn keygen(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    user_public_key: String,
+    user_secret_key_shares: Vec<Share<Secp256k1Scalar>>,
+) -> Result<Response, CustomContractError> {
+    let mut state = load_state(deps.storage)?;
+    let total_shares = state.num_of_users + state.threshold;
+
+    if user_secret_key_shares.len() != total_shares as usize {
+        return Err(CustomContractError::Std(StdError::generic_err(format!(
+            "Wrong number of user shares provided: {} vs expected: {}",
+            user_secret_key_shares.len(),
+            total_shares
+        ))));
+    }
+
+    // generate chain secret key
+    let silly = env.block.time.nanos().to_be_bytes();
+    let mut rng = Prng::new(b"hello", silly.as_slice());
+    let sk_chain = Secp256k1Scalar::random(&mut rng);
+
+    // generate chain public key
+    let pk_chain = Secp256k1Point::generate(&sk_chain);
+
+    // Calculate sum of public keys
+    let pk_user = Secp256k1Point::from_str(&user_public_key)
+        .map_err(|_| StdError::generic_err("Failed to decode user public key"))?;
+    state.public_key = pk_user + pk_chain;
+
+    let sk_chain_shares = scrt_sss::split(&mut rng, &sk_chain, state.threshold, total_shares);
+
+    // Chain has the last 't' shares. Compute over them
+    let mut sk_chain_shares_final = vec![];
+    
+    for i in state.num_of_users..total_shares {
+        sk_chain_shares_final
+            .push(user_secret_key_shares.get((i) as usize).unwrap() + sk_chain_shares.get(i as usize).unwrap());
+    }
+
+    // Store all to state so everyone can retreive later..
+
+    state.sk_user_shares = user_secret_key_shares;
+    state.sk_chain_shares = sk_chain_shares;
+    state.sk_chain_shares_final = sk_chain_shares_final;
+    state.sk_chain = sk_chain;
+
+    save_state(deps.storage, state)?;
+
+    Ok(Response::default())
 }
 
 fn create_presig(
@@ -151,6 +207,27 @@ fn create_presig(
     Ok(Response::default())
 }
 
+fn read_keygen(deps: Deps, _env: Env, user_index: u32) -> StdResult<ReadKeyGenResponse> {
+    // todo: authentication
+    let state = load_state(deps.storage)?;
+
+    // read the share from state
+
+    return Ok(ReadKeyGenResponse {
+        sk_user_share: state
+            .sk_user_shares
+            .get(user_index as usize)
+            .unwrap()
+            .clone(),
+        sk_chain_share: state
+            .sk_chain_shares
+            .get(user_index as usize)
+            .unwrap()
+            .clone(),
+        public_key: state.public_key.to_string(),
+    });
+}
+
 fn read_presig(deps: Deps, _env: Env, user_index: u32) -> StdResult<ReadPresigResponse> {
     // todo: authentication
     let state = load_state(deps.storage)?;
@@ -215,6 +292,7 @@ fn test_read_instance_secret(deps: Deps) -> StdResult<Secp256k1Scalar> {
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
+        QueryMsg::ReadKeyGen { user_index } => to_binary(&read_keygen(deps, env, user_index)?),
         QueryMsg::ReadPresig { user_index } => to_binary(&read_presig(deps, env, user_index)?),
         #[cfg(test)]
         QueryMsg::TestReadInstanceSecret {} => to_binary(&test_read_instance_secret(deps)?),
@@ -289,6 +367,50 @@ mod tests {
     }    
 
     #[test]
+    fn keygen_test() {
+        let mut deps = mock_dependencies();
+
+        let num_of_shares = 7u8;
+        let threshold = 2u8;
+        let total_shares = num_of_shares + threshold;
+
+        let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
+
+        let (sk_user_shares, sk_user, pk_user) = client_create_share(total_shares, threshold);
+        let msg = ExecuteMsg::KeyGen { 
+            user_public_key: pk_user.to_string(), 
+            user_secret_key_shares: sk_user_shares
+        };
+
+        let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        // Get all values..
+        let mut sk_shares = vec![];
+        let mut pk = Secp256k1Point::default();
+
+        for i in 0..=num_of_shares {
+            // read shares for each party
+
+            let msg = QueryMsg::ReadKeyGen {
+                user_index: i as u32,
+            };
+            let resp = query(deps.as_ref(), mock_env(), msg).unwrap();
+
+            let decoded_response: ReadKeyGenResponse = from_binary(&resp).unwrap();
+
+            let sk_share = decoded_response.sk_user_share + decoded_response.sk_chain_share;
+            pk = Secp256k1Point::from_str(&decoded_response.public_key).unwrap();
+            sk_shares.push(sk_share);
+        }
+
+        let sk = scrt_sss::open(sk_shares).unwrap();
+        let computed_pk = Secp256k1Point::generate(&sk);
+        assert_eq!(pk, computed_pk);
+
+        println!("KeyGen successful!");
+    }
+
+    #[test]
     // #[cfg(feature = "rand-std")]
     fn execute_test() {
         let mut deps = mock_dependencies();
@@ -296,11 +418,10 @@ mod tests {
         let num_of_shares = 7u8;
         let threshold = 2u8;
         let total_shares = num_of_shares + threshold;
-        // 5 users: 8 shares
-        let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
 
-        // TODO: KeyGen
+        // TODO: KeyGen - for now good enough to just ignore..
         let (sk_shares, sk, pk) = client_create_share(total_shares, threshold);
+        let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
 
         // Generate 4 values and their shares: k_user, a_user, 0, 0
         let (k_user_shares, k_user, k_user_public) = client_create_share(total_shares, threshold);

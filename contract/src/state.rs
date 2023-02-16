@@ -28,6 +28,18 @@ pub fn load_state(storage: &dyn Storage) -> StdResult<State> {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct State {
+    // Public params
+    pub num_of_users: u8,
+    pub threshold: u8,
+
+    // Keygen
+    pub public_key: Secp256k1Point,
+    pub sk_chain: Secp256k1Scalar,
+    pub sk_user_shares: Vec<Share<Secp256k1Scalar>>,
+    pub sk_chain_shares: Vec<Share<Secp256k1Scalar>>,
+    pub sk_chain_shares_final: Vec<Share<Secp256k1Scalar>>,
+    
+    //// Presig data
     // k, R=k*G (instance key pair)
     pub k_chain_shares: Vec<Share<Secp256k1Scalar>>,
     pub k_user_shares: Vec<Share<Secp256k1Scalar>>,
@@ -48,9 +60,7 @@ pub struct State {
     pub chain_zero_shares_final1: Vec<Share<Secp256k1Scalar>>,
     pub chain_zero_shares_final2: Vec<Share<Secp256k1Scalar>>,
 
-    pub num_of_users: u8,
-    pub threshold: u8,
-
     #[cfg(test)]
     pub chain_private_instance_key: Secp256k1Scalar,
+    // pub chain_private_key: Secp256k1Scalar,
 }

@@ -23,6 +23,10 @@ pub enum ExecuteMsg {
         user_zero_shares2: Vec<Share<Secp256k1Scalar>>,
         public_instance_key: String,
     },
+    KeyGen {
+        user_public_key: String,
+        user_secret_key_shares: Vec<Share<Secp256k1Scalar>>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -49,10 +53,19 @@ pub enum Status {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    /// User that wants to read their share (todo: authentication)
+    /// User that wants to read their shares of data - keygen or presig (todo: authentication)
+    ReadKeyGen { user_index: u32 },
     ReadPresig { user_index: u32 },
     #[cfg(test)]
     TestReadInstanceSecret {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct ReadKeyGenResponse {
+    pub(crate) sk_user_share: Share<Secp256k1Scalar>,
+    pub(crate) sk_chain_share: Share<Secp256k1Scalar>,
+    pub(crate) public_key: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -68,3 +81,4 @@ pub struct ReadPresigResponse {
     pub(crate) chain_zero_share1: Share<Secp256k1Scalar>,
     pub(crate) chain_zero_share2: Share<Secp256k1Scalar>
 }
+
