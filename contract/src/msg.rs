@@ -27,6 +27,11 @@ pub enum ExecuteMsg {
         user_public_key: String,
         user_secret_key_shares: Vec<Share<Secp256k1Scalar>>,
     },
+    Sign {
+        user_index: u32,
+        user_sig_num_share: Share<Secp256k1Scalar>,
+        user_sig_denom_share: Share<Secp256k1Scalar>
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]

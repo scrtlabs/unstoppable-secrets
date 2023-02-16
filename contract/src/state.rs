@@ -60,6 +60,10 @@ pub struct State {
     pub chain_zero_shares_final1: Vec<Share<Secp256k1Scalar>>,
     pub chain_zero_shares_final2: Vec<Share<Secp256k1Scalar>>,
 
+    // sig values
+    pub sig_num_shares: Vec<Share<Secp256k1Scalar>>,
+    pub sig_denom_shares: Vec<Share<Secp256k1Scalar>>,
+
     #[cfg(test)]
     pub chain_private_instance_key: Secp256k1Scalar,
     // pub chain_private_key: Secp256k1Scalar,

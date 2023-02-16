@@ -20,6 +20,11 @@ pub fn instantiate(
 
     state.num_of_users = msg.number_of_users as u8;
     state.threshold = msg.signing_threshold as u8;
+    let sig_num_shares = vec![];
+    let sig_denom_shares = vec![];
+
+    state.sig_num_shares = sig_num_shares;
+    state.sig_denom_shares = sig_denom_shares;
 
     save_state(deps.storage, state)?;
 
@@ -40,6 +45,9 @@ pub fn execute(
         ExecuteMsg::KeyGen {
             user_public_key, user_secret_key_shares, ..
         } => keygen(deps, env, info, user_public_key, user_secret_key_shares),
+        ExecuteMsg::Sign {
+            user_index, user_sig_num_share, user_sig_denom_share, ..
+        } => execute_sign(deps, env, info, user_index, user_sig_num_share, user_sig_denom_share),
     }
 }
 
@@ -202,6 +210,88 @@ fn create_presig(
         state.chain_private_instance_key = k_chain;
     }
 
+    save_state(deps.storage, state)?;
+
+    Ok(Response::default())
+}
+
+fn execute_sign(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    user_index: u32,
+    user_sig_num_share: Share<Secp256k1Scalar>,
+    user_sig_denom_share: Share<Secp256k1Scalar>,
+) -> Result<Response, CustomContractError> {
+    let mut state = load_state(deps.storage)?;
+    let total_shares = state.num_of_users + state.threshold;
+
+    // Store user's shares
+    state.sig_num_shares.push(user_sig_num_share);
+    state.sig_denom_shares.push(user_sig_denom_share);
+
+    if state.sig_num_shares.len() + (state.threshold as usize) <= ((2*state.threshold + 1) as usize) {
+        // Not enough shares yet to produce a signature
+        return Ok(Response::default());
+    }
+
+    // We have 2t+1 shares --> can produce a signature on-chain
+    
+    // TODO: not deterministic message..
+    let message_arr = [6u8; 32];
+    let m = Secp256k1Scalar::from_slice(&message_arr).unwrap();
+
+    let r = state.public_instance_key.x();
+    // Produce the t 'chain' shares
+    for i in 0..=state.threshold {
+        let sk_share = state
+            .sk_chain_shares_final
+            .get(i as usize)
+            .unwrap()
+            .clone();
+
+        let k_share = state
+            .k_chain_shares_final
+            .get(i as usize)
+            .unwrap()
+            .clone();
+
+        let a_share = state
+            .a_chain_shares_final
+            .get(i as usize)
+            .unwrap()
+            .clone();
+
+        let zero_share1 = state
+            .chain_zero_shares_final1
+            .get(i as usize)
+            .unwrap()
+            .clone();
+
+        let zero_share2 = state
+            .chain_zero_shares_final2
+            .get(i as usize)
+            .unwrap()
+            .clone();
+
+        let sig_num_share = a_share.clone() * (m.clone() + (r.clone() * sk_share.data)) - zero_share1.clone();
+        let sig_denom_share = k_share.clone() * a_share.clone().data - zero_share2.clone();
+        // println!("Shares ids are: {:?}, {:?}, {:?}", sk_share.id, sig_num_share.id, sig_denom_share.id);
+        state.sig_num_shares.push(sig_num_share);
+        state.sig_denom_shares.push(sig_denom_share);
+    }
+
+    let s1 = scrt_sss::open(state.sig_num_shares).unwrap();
+    let s2 = scrt_sss::open(state.sig_denom_shares).unwrap();
+    let s = s1*s2.inv();
+    // println!("The value of s is {:?}", s.to_hex());
+
+    /////////////
+    // TODO: FIX HERE
+    // TODO: need to take message_arr (byte array - might already work), sig = (r: , s), and public_key: Secp256k1Point and make them work with deps.api.secp256k1_verify
+    /////////////
+    
+    // TODO: save sig?
     save_state(deps.storage, state)?;
 
     Ok(Response::default())
