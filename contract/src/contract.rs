@@ -103,7 +103,7 @@ fn create_share(
     state.public_key = user_pk + chain_public_key;
 
     let k_chain_shares = scrt_sss::split(&mut rng, &k_chain, state.threshold, total_shares);
-    let a_chain_shares = scrt_sss::split(&mut rng, &k_chain, state.threshold, total_shares);
+    let a_chain_shares = scrt_sss::split(&mut rng, &a_chain, state.threshold, total_shares);
     let chain_zero_shares1 = scrt_sss::split(&mut rng, &Secp256k1Scalar::zero(), state.threshold*2, total_shares);
     let chain_zero_shares2 = scrt_sss::split(&mut rng, &Secp256k1Scalar::zero(), state.threshold*2, total_shares);
 
@@ -116,7 +116,7 @@ fn create_share(
         k_chain_shares_final
             .push(k_user_shares.get((i) as usize).unwrap() + k_chain_shares.get(i as usize).unwrap());
         a_chain_shares_final
-            .push(a_user_shares.get((i) as usize).unwrap() + k_chain_shares.get(i as usize).unwrap());
+            .push(a_user_shares.get((i) as usize).unwrap() + a_chain_shares.get(i as usize).unwrap());
         chain_zero_shares_final1
             .push(user_zero_shares1.get((i) as usize).unwrap() + chain_zero_shares1.get(i as usize).unwrap());
         chain_zero_shares_final2
