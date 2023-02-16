@@ -288,7 +288,7 @@ fn execute_sign(
     // println!("The value of s is {:?}", s.to_hex());
 
     // for mesasge hash we can just use message_arr here, but I want to test if
-    // to_raw() is the oposite of Secp256k1Scalar::from_slice(), e.g.:
+    // to_raw() is the opposite of Secp256k1Scalar::from_slice(), e.g.:
     // Secp256k1Scalar::from_slice(&message_arr).unwrap().to_raw()
 
     let msg_hash_for_precompiled = &m.to_raw();
