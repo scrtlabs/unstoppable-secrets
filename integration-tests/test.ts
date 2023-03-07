@@ -1,11 +1,16 @@
+import { ec } from "elliptic";
 import * as fs from "fs";
 import {
+  fromBase64,
   MsgInstantiateContractResponse,
   MsgStoreCodeResponse,
   SecretNetworkClient,
+  toHex,
   Wallet,
 } from "secretjs";
-import { AminoWallet } from "secretjs/dist/wallet_amino";
+import * as sss from "sssa-js";
+
+const secp256k1 = new ec("secp256k1");
 
 export async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -34,8 +39,7 @@ export async function waitForBlocks(chainId: string) {
 type Account = {
   address: string;
   mnemonic: string;
-  walletAmino: AminoWallet;
-  walletProto: Wallet;
+  wallet: Wallet;
   secretjs: SecretNetworkClient;
 };
 
@@ -56,16 +60,15 @@ beforeAll(async () => {
   // Create clients for all of the existing wallets in secretdev-1
   for (let i = 0; i < mnemonics.length; i++) {
     const mnemonic = mnemonics[i];
-    const walletAmino = new AminoWallet(mnemonic);
+    const wallet = new Wallet(mnemonic);
     accounts.push({
-      address: walletAmino.address,
+      address: wallet.address,
       mnemonic: mnemonic,
-      walletAmino,
-      walletProto: new Wallet(mnemonic),
+      wallet: wallet,
       secretjs: new SecretNetworkClient({
         url: "http://localhost:1317",
-        wallet: walletAmino,
-        walletAddress: walletAmino.address,
+        wallet: wallet,
+        walletAddress: wallet.address,
         chainId: "secretdev-1",
       }),
     });
@@ -88,7 +91,7 @@ beforeAll(async () => {
       source: "",
       builder: "",
     },
-    { gasLimit: 1_000_000 }
+    { gasLimit: 2_000_000 }
   );
 
   if (tx.code !== 0) {
@@ -117,19 +120,42 @@ beforeAll(async () => {
   expect(tx.code).toBe(0);
 
   contract = MsgInstantiateContractResponse.decode(tx.data[0]).address;
-});
+}, 90_000);
+
+type Share = {
+  id: number;
+  data: string; // hex string
+  threshold: number;
+  share_count: number;
+};
 
 describe("KeyGen", () => {
   test("happy path", async () => {
     const { secretjs } = accounts[0];
+
+    const keyPair = secp256k1.genKeyPair();
+    const pubkeyHex = keyPair.getPublic("hex").slice(2); // raw pubkey
+    const privkeyHex = keyPair.getPrivate("hex");
+
+    const rawShares = sss.create(2, 9, privkeyHex);
+    const parsedShares: Share[] = rawShares.map((share: string, i: number) => ({
+      id: i + 1,
+      data: "0000000000000000000000000000000000000000000000000000000000000000" /* toHex(
+        fromBase64(share.substring(0, 44).replace(/_/g, "/").replace(/-/g, "+"))
+      ) */,
+      threshold: 2,
+      share_count: 9,
+    }));
 
     const tx = await secretjs.tx.compute.executeContract(
       {
         sender: secretjs.address,
         contract_address: contract,
         msg: {
-          user_public_key: "hex string...",
-          user_secret_key_shares: 3,
+          key_gen: {
+            user_public_key: pubkeyHex, // raw pubkey - 64 bytes
+            user_secret_key_shares: parsedShares,
+          },
         },
       },
       { gasLimit: 1_000_000 }
@@ -139,35 +165,37 @@ describe("KeyGen", () => {
       console.log(tx.rawLog);
     }
     expect(tx.code).toBe(0);
+
+    console.log("Keygen gas:", tx.gasUsed);
   });
 
-  test("e.g. wrong user_public_key format", async () => {});
+  test.skip("e.g. wrong user_public_key format", async () => {});
 
-  test("e.g. wrong user_secret_key_shares", async () => {});
+  test.skip("e.g. wrong user_secret_key_shares", async () => {});
 });
 
 describe("CreatePresig", () => {
-  test("happy path", async () => {});
+  test.skip("happy path", async () => {});
 
-  test("e.g. wrong user_index", async () => {});
+  test.skip("e.g. wrong user_index", async () => {});
 
-  test("e.g. wrong k_user_shares", async () => {});
+  test.skip("e.g. wrong k_user_shares", async () => {});
 
-  test("e.g. wrong a_user_shares", async () => {});
+  test.skip("e.g. wrong a_user_shares", async () => {});
 
-  test("e.g. wrong user_zero_shares1", async () => {});
+  test.skip("e.g. wrong user_zero_shares1", async () => {});
 
-  test("e.g. wrong user_zero_shares2", async () => {});
+  test.skip("e.g. wrong user_zero_shares2", async () => {});
 
-  test("e.g. wrong public_instance_key", async () => {});
+  test.skip("e.g. wrong public_instance_key", async () => {});
 });
 
 describe("Sign", () => {
-  test("happy path", async () => {});
+  test.skip("happy path", async () => {});
 
-  test("e.g. wrong user_index", async () => {});
+  test.skip("e.g. wrong user_index", async () => {});
 
-  test("e.g. wrong user_sig_num_share", async () => {});
+  test.skip("e.g. wrong user_sig_num_share", async () => {});
 
-  test("e.g. wrong user_sig_denom_share", async () => {});
+  test.skip("e.g. wrong user_sig_denom_share", async () => {});
 });
