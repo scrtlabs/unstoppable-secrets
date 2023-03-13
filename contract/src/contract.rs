@@ -41,14 +41,40 @@ pub fn execute(
 ) -> Result<Response, CustomContractError> {
     match msg {
         ExecuteMsg::CreatePresig {
-            public_instance_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2, ..
-        } => create_presig(deps, env, info, public_instance_key, k_user_shares, a_user_shares, user_zero_shares1, user_zero_shares2),
+            public_instance_key,
+            k_user_shares,
+            a_user_shares,
+            user_zero_shares1,
+            user_zero_shares2,
+            ..
+        } => create_presig(
+            deps,
+            env,
+            info,
+            public_instance_key,
+            k_user_shares,
+            a_user_shares,
+            user_zero_shares1,
+            user_zero_shares2,
+        ),
         ExecuteMsg::KeyGen {
-            user_public_key, user_secret_key_shares, ..
+            user_public_key,
+            user_secret_key_shares,
+            ..
         } => keygen(deps, env, info, user_public_key, user_secret_key_shares),
         ExecuteMsg::Sign {
-            user_index, user_sig_num_share, user_sig_denom_share, ..
-        } => execute_sign(deps, env, info, user_index, user_sig_num_share, user_sig_denom_share),
+            user_index,
+            user_sig_num_share,
+            user_sig_denom_share,
+            ..
+        } => execute_sign(
+            deps,
+            env,
+            info,
+            user_index,
+            user_sig_num_share,
+            user_sig_denom_share,
+        ),
     }
 }
 
@@ -87,10 +113,12 @@ fn keygen(
 
     // Chain has the last 't' shares. Compute over them
     let mut sk_chain_shares_final = vec![];
-    
+
     for i in state.num_of_users..total_shares {
-        sk_chain_shares_final
-            .push(user_secret_key_shares.get((i) as usize).unwrap() + sk_chain_shares.get(i as usize).unwrap());
+        sk_chain_shares_final.push(
+            user_secret_key_shares.get((i) as usize).unwrap()
+                + sk_chain_shares.get(i as usize).unwrap(),
+        );
     }
 
     // Store all to state so everyone can retreive later..
@@ -169,8 +197,18 @@ fn create_presig(
 
     let k_chain_shares = scrt_sss::split(&mut rng, &k_chain, state.threshold, total_shares);
     let a_chain_shares = scrt_sss::split(&mut rng, &a_chain, state.threshold, total_shares);
-    let chain_zero_shares1 = scrt_sss::split(&mut rng, &Secp256k1Scalar::zero(), state.threshold*2, total_shares);
-    let chain_zero_shares2 = scrt_sss::split(&mut rng, &Secp256k1Scalar::zero(), state.threshold*2, total_shares);
+    let chain_zero_shares1 = scrt_sss::split(
+        &mut rng,
+        &Secp256k1Scalar::zero(),
+        state.threshold * 2,
+        total_shares,
+    );
+    let chain_zero_shares2 = scrt_sss::split(
+        &mut rng,
+        &Secp256k1Scalar::zero(),
+        state.threshold * 2,
+        total_shares,
+    );
 
     // Chain has the last 't' shares. Compute over them
     let mut k_chain_shares_final = vec![];
@@ -178,14 +216,20 @@ fn create_presig(
     let mut chain_zero_shares_final1 = vec![];
     let mut chain_zero_shares_final2 = vec![];
     for i in state.num_of_users..total_shares {
-        k_chain_shares_final
-            .push(k_user_shares.get((i) as usize).unwrap() + k_chain_shares.get(i as usize).unwrap());
-        a_chain_shares_final
-            .push(a_user_shares.get((i) as usize).unwrap() + a_chain_shares.get(i as usize).unwrap());
-        chain_zero_shares_final1
-            .push(user_zero_shares1.get((i) as usize).unwrap() + chain_zero_shares1.get(i as usize).unwrap());
-        chain_zero_shares_final2
-            .push(user_zero_shares2.get((i) as usize).unwrap() + chain_zero_shares2.get(i as usize).unwrap());
+        k_chain_shares_final.push(
+            k_user_shares.get((i) as usize).unwrap() + k_chain_shares.get(i as usize).unwrap(),
+        );
+        a_chain_shares_final.push(
+            a_user_shares.get((i) as usize).unwrap() + a_chain_shares.get(i as usize).unwrap(),
+        );
+        chain_zero_shares_final1.push(
+            user_zero_shares1.get((i) as usize).unwrap()
+                + chain_zero_shares1.get(i as usize).unwrap(),
+        );
+        chain_zero_shares_final2.push(
+            user_zero_shares2.get((i) as usize).unwrap()
+                + chain_zero_shares2.get(i as usize).unwrap(),
+        );
     }
 
     // Store all to state so everyone can retreive later..
@@ -231,7 +275,9 @@ fn execute_sign(
     state.sig_num_shares.push(user_sig_num_share);
     state.sig_denom_shares.push(user_sig_denom_share);
 
-    if state.sig_num_shares.len() + (state.threshold as usize) < ((2*state.threshold + 1) as usize) {
+    if state.sig_num_shares.len() + (state.threshold as usize)
+        < ((2 * state.threshold + 1) as usize)
+    {
         // Not enough shares yet to produce a signature
         // println!("Not enough shares yet!");
         save_state(deps.storage, state)?;
@@ -253,23 +299,11 @@ fn execute_sign(
     let r = state.public_instance_key.x();
     // Produce the t 'chain' shares
     for i in 0..=state.threshold - 1 {
-        let sk_share = state
-            .sk_chain_shares_final
-            .get(i as usize)
-            .unwrap()
-            .clone();
+        let sk_share = state.sk_chain_shares_final.get(i as usize).unwrap().clone();
 
-        let k_share = state
-            .k_chain_shares_final
-            .get(i as usize)
-            .unwrap()
-            .clone();
+        let k_share = state.k_chain_shares_final.get(i as usize).unwrap().clone();
 
-        let a_share = state
-            .a_chain_shares_final
-            .get(i as usize)
-            .unwrap()
-            .clone();
+        let a_share = state.a_chain_shares_final.get(i as usize).unwrap().clone();
 
         let zero_share1 = state
             .chain_zero_shares_final1
@@ -283,7 +317,8 @@ fn execute_sign(
             .unwrap()
             .clone();
 
-        let sig_num_share = a_share.clone() * (m.clone() + (r.clone() * sk_share.data)) - zero_share1.clone();
+        let sig_num_share =
+            a_share.clone() * (m.clone() + (r.clone() * sk_share.data)) - zero_share1.clone();
         let sig_denom_share = k_share.clone() * a_share.clone().data - zero_share2.clone();
         // println!("Shares ids are: {:?}, {:?}, {:?}", sk_share.id, sig_num_share.id, sig_denom_share.id);
         state.sig_num_shares.push(sig_num_share);
@@ -292,7 +327,7 @@ fn execute_sign(
 
     let s1 = scrt_sss::open(state.sig_num_shares.clone()).unwrap();
     let s2 = scrt_sss::open(state.sig_denom_shares.clone()).unwrap();
-    let s = s1*s2.inv();
+    let s = s1 * s2.inv();
     // println!("The value of s is {:?}", s.to_hex());
 
     // for mesasge hash we can just use message_arr here, but I want to test if
@@ -447,34 +482,39 @@ mod tests {
         threshold: u8,
         compute_public: bool,
         compute_secret: bool,
-    ) -> (Vec<Share<Secp256k1Scalar>>, Option<Secp256k1Scalar>, Option<Secp256k1Point>) {
+    ) -> (
+        Vec<Share<Secp256k1Scalar>>,
+        Option<Secp256k1Scalar>,
+        Option<Secp256k1Point>,
+    ) {
         let mut rng = rand::thread_rng();
-    
+
         let secret = if compute_secret {
             Some(Secp256k1Scalar::random(&mut rng))
         } else {
             Some(Secp256k1Scalar::zero())
         };
-    
+
         let public = if compute_public {
             Some(Secp256k1Point::generate(secret.as_ref().unwrap()))
         } else {
             None
         };
-    
+
         let shares = scrt_sss::split(&mut rng, secret.as_ref().unwrap(), threshold, num_of_shares);
-    
+
         return (shares, secret, public);
     }
-    
+
     fn client_create_share(
         num_of_shares: u8,
         threshold: u8,
     ) -> (Vec<Share<Secp256k1Scalar>>, Secp256k1Scalar, Secp256k1Point) {
-        let (shares, secret, public) = client_create_share_helper(num_of_shares, threshold, true, true);
+        let (shares, secret, public) =
+            client_create_share_helper(num_of_shares, threshold, true, true);
         return (shares, secret.unwrap(), public.unwrap());
     }
-    
+
     fn client_create_share_no_public(
         num_of_shares: u8,
         threshold: u8,
@@ -482,14 +522,14 @@ mod tests {
         let (shares, secret, _) = client_create_share_helper(num_of_shares, threshold, false, true);
         return (shares, secret.unwrap());
     }
-    
+
     fn client_create_share_no_secret(
         num_of_shares: u8,
         threshold: u8,
     ) -> Vec<Share<Secp256k1Scalar>> {
         let (shares, _, _) = client_create_share_helper(num_of_shares, threshold, false, false);
         return shares;
-    }    
+    }
 
     #[test]
     fn keygen_test() {
@@ -502,9 +542,9 @@ mod tests {
         let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
 
         let (sk_user_shares, sk_user, pk_user) = client_create_share(total_shares, threshold);
-        let msg = ExecuteMsg::KeyGen { 
-            user_public_key: pk_user.to_string(), 
-            user_secret_key_shares: sk_user_shares
+        let msg = ExecuteMsg::KeyGen {
+            user_public_key: pk_user.to_string(),
+            user_secret_key_shares: sk_user_shares,
         };
 
         let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
@@ -538,104 +578,140 @@ mod tests {
     #[test]
     // #[cfg(feature = "rand-std")]
     fn execute_test() {
+        use std::fs::File;
+        use std::io::prelude::*;
+        use std::time::Instant;
+
         let mut deps = mock_dependencies();
 
-        let num_of_shares = 6u8;
-        let threshold = 4u8;
-        let total_shares = num_of_shares + threshold;
+        for n in 2..16 {
+            for t in 1..n {
+                let num_of_shares = n;
+                let threshold = t;
+                let total_shares = num_of_shares + threshold;
 
-        let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
+                let now = Instant::now();
+                let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
+                let elapsed = now.elapsed().as_nanos();
+                println!("{},{},init,{}", n, t, elapsed);
 
-        //// Keygen
+                //// Keygen
 
-        let (sk_user_shares, sk_user, pk_user) = client_create_share(total_shares, threshold);
-        let msg = ExecuteMsg::KeyGen { 
-            user_public_key: pk_user.to_string(), 
-            user_secret_key_shares: sk_user_shares
-        };
+                let (sk_user_shares, sk_user, pk_user) =
+                    client_create_share(total_shares, threshold);
+                let msg = ExecuteMsg::KeyGen {
+                    user_public_key: pk_user.to_string(),
+                    user_secret_key_shares: sk_user_shares,
+                };
 
-        let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+                let x = to_binary(&msg);
 
-        // Get all values..
-        let mut sk_shares = vec![];
-        let mut pk = Secp256k1Point::default();
+                let now = Instant::now();
+                let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+                let elapsed = now.elapsed().as_nanos();
+                println!("{},{},keygen,{}", n, t, elapsed);
+                let mut file = File::create(format!("{}_{}_keygen.json", n, t)).unwrap();
+                file.write_all(x.unwrap().as_slice()).unwrap();
 
-        for i in 0..=num_of_shares - 1 {
-            // read shares for each party
+                // Get all values..
+                let mut sk_shares = vec![];
+                let mut pk = Secp256k1Point::default();
 
-            let msg = QueryMsg::ReadKeyGen {
-                user_index: i as u32,
-            };
-            let resp = query(deps.as_ref(), mock_env(), msg).unwrap();
+                for i in 0..=num_of_shares - 1 {
+                    // read shares for each party
 
-            let decoded_response: ReadKeyGenResponse = from_binary(&resp).unwrap();
+                    let msg = QueryMsg::ReadKeyGen {
+                        user_index: i as u32,
+                    };
+                    let resp = query(deps.as_ref(), mock_env(), msg).unwrap();
 
-            let sk_share = decoded_response.sk_user_share + decoded_response.sk_chain_share;
-            pk = Secp256k1Point::from_str(&decoded_response.public_key).unwrap();
-            sk_shares.push(sk_share);
+                    let decoded_response: ReadKeyGenResponse = from_binary(&resp).unwrap();
+
+                    let sk_share = decoded_response.sk_user_share + decoded_response.sk_chain_share;
+                    pk = Secp256k1Point::from_str(&decoded_response.public_key).unwrap();
+                    sk_shares.push(sk_share);
+                }
+
+                //// Presig
+
+                // Generate 4 values and their shares: k_user, a_user, 0, 0
+                let (k_user_shares, k_user, k_user_public) =
+                    client_create_share(total_shares, threshold);
+                let (a_user_shares, a_user) =
+                    client_create_share_no_public(total_shares, threshold);
+                let user_zero_shares1 = client_create_share_no_secret(total_shares, threshold * 2);
+                let user_zero_shares2 = client_create_share_no_secret(total_shares, threshold * 2);
+
+                let msg = ExecuteMsg::CreatePresig {
+                    user_index: 0,
+                    k_user_shares: k_user_shares,
+                    a_user_shares: a_user_shares,
+                    user_zero_shares1: user_zero_shares1,
+                    user_zero_shares2: user_zero_shares2,
+                    public_instance_key: k_user_public.to_string(),
+                };
+
+                let x = to_binary(&msg);
+
+                let now = Instant::now();
+                let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+                let elapsed = now.elapsed().as_nanos();
+                println!("{},{},presig,{}", n, t, elapsed);
+                let mut file = File::create(format!("{}_{}_presign.json", n, t)).unwrap();
+                file.write_all(x.unwrap().as_slice()).unwrap();
+                //// Sign
+                // Get all values..
+                let mut pk_from_chain = Secp256k1Point::default();
+                let message_arr = [6u8; 32]; // TODO: custom message..
+                let m = Secp256k1Scalar::from_slice(&message_arr).unwrap();
+
+                for i in 0..=num_of_shares - 1 {
+                    // read shares for each party
+
+                    let msg = QueryMsg::ReadPresig {
+                        user_index: i as u32,
+                    };
+                    let resp = query(deps.as_ref(), mock_env(), msg).unwrap();
+
+                    let decoded_response: ReadPresigResponse = from_binary(&resp).unwrap();
+
+                    let k_share = decoded_response.k_user_share + decoded_response.k_chain_share;
+                    let a_share = decoded_response.a_user_share + decoded_response.a_chain_share;
+                    let zero_share1 =
+                        decoded_response.user_zero_share1 + decoded_response.chain_zero_share1;
+                    let zero_share2 =
+                        decoded_response.user_zero_share2 + decoded_response.chain_zero_share2;
+
+                    pk_from_chain =
+                        Secp256k1Point::from_str(&decoded_response.public_instance_key).unwrap();
+                    let r = pk_from_chain.x();
+
+                    let sk_share = sk_shares.get(i as usize).unwrap().clone();
+
+                    let sig_num_share =
+                        a_share.clone() * (m.clone() + (r * sk_share.data)) - zero_share1.clone();
+                    let sig_denom_share =
+                        k_share.clone() * a_share.clone().data - zero_share2.clone();
+                    // println!("Shares ids are: {:?}, {:?}, {:?}", sk_share.id, sig_num_share.id, sig_denom_share.id);
+
+                    let msg = ExecuteMsg::Sign {
+                        user_index: i as u32,
+                        user_sig_num_share: sig_num_share,
+                        user_sig_denom_share: sig_denom_share,
+                    };
+
+                    let x = to_binary(&msg);
+
+                    let now = Instant::now();
+                    let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+                    let elapsed = now.elapsed().as_nanos();
+                    println!("{},{},sign,{}", n, t, elapsed);
+                    let mut file = File::create(format!("{}_{}_sign.json", n, t)).unwrap();
+                    file.write_all(x.unwrap().as_slice()).unwrap();
+                    break;
+                }
+            }
         }
-
-        //// Presig
-
-        // Generate 4 values and their shares: k_user, a_user, 0, 0
-        let (k_user_shares, k_user, k_user_public) = client_create_share(total_shares, threshold);
-        let (a_user_shares, a_user) = client_create_share_no_public(total_shares, threshold);
-        let user_zero_shares1 = client_create_share_no_secret(total_shares, threshold*2);
-        let user_zero_shares2 = client_create_share_no_secret(total_shares, threshold*2);
-
-        let msg = ExecuteMsg::CreatePresig {
-            user_index: 0,
-            k_user_shares: k_user_shares,
-            a_user_shares: a_user_shares,
-            user_zero_shares1: user_zero_shares1,
-            user_zero_shares2: user_zero_shares2,
-            public_instance_key: k_user_public.to_string(),
-        };
-
-        let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
-
-        //// Sign
-        // Get all values..
-        let mut pk_from_chain = Secp256k1Point::default();
-        let message_arr = [6u8; 32]; // TODO: custom message..
-        let m = Secp256k1Scalar::from_slice(&message_arr).unwrap();
-
-        for i in 0..=num_of_shares - 1 {
-            // read shares for each party
-
-            let msg = QueryMsg::ReadPresig {
-                user_index: i as u32,
-            };
-            let resp = query(deps.as_ref(), mock_env(), msg).unwrap();
-
-            let decoded_response: ReadPresigResponse = from_binary(&resp).unwrap();
-
-            let k_share = decoded_response.k_user_share + decoded_response.k_chain_share;
-            let a_share = decoded_response.a_user_share + decoded_response.a_chain_share;
-            let zero_share1 = decoded_response.user_zero_share1 + decoded_response.chain_zero_share1;
-            let zero_share2 = decoded_response.user_zero_share2 + decoded_response.chain_zero_share2;
-
-            pk_from_chain = Secp256k1Point::from_str(&decoded_response.public_instance_key).unwrap();
-            let r = pk_from_chain.x();
-            
-            let sk_share = sk_shares
-            .get(i as usize)
-            .unwrap()
-            .clone();
-
-            let sig_num_share = a_share.clone() * (m.clone() + (r * sk_share.data)) - zero_share1.clone();
-            let sig_denom_share = k_share.clone() * a_share.clone().data - zero_share2.clone();
-            // println!("Shares ids are: {:?}, {:?}, {:?}", sk_share.id, sig_num_share.id, sig_denom_share.id);
-
-            let msg = ExecuteMsg::Sign {
-                user_index: i as u32,
-                user_sig_num_share: sig_num_share,
-                user_sig_denom_share: sig_denom_share
-            };
-    
-            let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
-        }
-
     }
 
     #[test]
@@ -654,8 +730,8 @@ mod tests {
         // Generate 4 values and their shares: k_user, a_user, 0, 0
         let (k_user_shares, k_user, k_user_public) = client_create_share(total_shares, threshold);
         let (a_user_shares, a_user) = client_create_share_no_public(total_shares, threshold);
-        let user_zero_shares1 = client_create_share_no_secret(total_shares, threshold*2);
-        let user_zero_shares2 = client_create_share_no_secret(total_shares, threshold*2);
+        let user_zero_shares1 = client_create_share_no_secret(total_shares, threshold * 2);
+        let user_zero_shares2 = client_create_share_no_secret(total_shares, threshold * 2);
 
         let msg = ExecuteMsg::CreatePresig {
             user_index: 0,
@@ -692,12 +768,14 @@ mod tests {
 
             let k_share = decoded_response.k_user_share + decoded_response.k_chain_share;
             let a_share = decoded_response.a_user_share + decoded_response.a_chain_share;
-            let zero_share1 = decoded_response.user_zero_share1 + decoded_response.chain_zero_share1;
-            let zero_share2 = decoded_response.user_zero_share2 + decoded_response.chain_zero_share2;
+            let zero_share1 =
+                decoded_response.user_zero_share1 + decoded_response.chain_zero_share1;
+            let zero_share2 =
+                decoded_response.user_zero_share2 + decoded_response.chain_zero_share2;
 
-            pk_from_chain = Secp256k1Point::from_str(&decoded_response.public_instance_key).unwrap();
+            pk_from_chain =
+                Secp256k1Point::from_str(&decoded_response.public_instance_key).unwrap();
             let r = pk_from_chain.x();
-
 
             let k_copy = k_share.clone();
             let a_copy = a_share.clone();
@@ -709,15 +787,15 @@ mod tests {
             a_shares.push(a_share);
             zero_shares1.push(zero_share1);
             zero_shares2.push(zero_share2);
-            
-            let sk_share = sk_shares
-            .get(i as usize)
-            .unwrap()
-            .clone();
+
+            let sk_share = sk_shares.get(i as usize).unwrap().clone();
 
             let sig_num_share = a_copy * (m.clone() + (r * sk_share.data)) - zero1_copy;
             let sig_denom_share = k_copy * a_copy2.data - zero2_copy;
-            println!("Shares ids are: {:?}, {:?}, {:?}", sk_share.id, sig_num_share.id, sig_denom_share.id);
+            println!(
+                "Shares ids are: {:?}, {:?}, {:?}",
+                sk_share.id, sig_num_share.id, sig_denom_share.id
+            );
             sig_num.push(sig_num_share);
             sig_denom.push(sig_denom_share);
         }
@@ -746,7 +824,7 @@ mod tests {
         assert_eq!(recovered, ref_val);
 
         let recovered = scrt_sss::open(sig_denom.clone()).unwrap();
-        let ref_val = a.clone()*k.clone();
+        let ref_val = a.clone() * k.clone();
         assert_eq!(recovered, ref_val);
 
         // Test a local (non MPC) sig
@@ -764,7 +842,7 @@ mod tests {
 
         let s1 = scrt_sss::open(sig_num).unwrap();
         let s2 = scrt_sss::open(sig_denom).unwrap();
-        let s = s1*s2.inv();
+        let s = s1 * s2.inv();
         println!("The value of s is {:?}", s.to_hex());
 
         let sig = Signature {
@@ -773,7 +851,6 @@ mod tests {
         };
         assert!(verify(&message, &sig, &pk_lib));
         println!("MPC sig verified successfully!");
-
     }
 
     use secp256k1::hashes::sha256;
@@ -804,7 +881,7 @@ mod tests {
         for i in 0..32 {
             seckey_a[i] = secp_privkey[i];
         }
-        
+
         let message = Message::parse(&message_arr);
 
         let seckey = SecretKey::parse(&seckey_a).unwrap();
@@ -843,5 +920,4 @@ mod tests {
         assert!(verify(&message, &sig, &pk));
         println!("The value of (r,s)) is {:?}", sig);
     }
-    
 }

@@ -1,38 +1,45 @@
 import { ec } from "elliptic";
 import * as fs from "fs";
 import {
-  fromBase64,
+  coinsFromString,
   MsgInstantiateContractResponse,
   MsgStoreCodeResponse,
   SecretNetworkClient,
-  toHex,
+  stringToCoins,
+  TxResultCode,
   Wallet,
 } from "secretjs";
-import * as sss from "sssa-js";
+import util from "util";
 
-const secp256k1 = new ec("secp256k1");
+export const exec = util.promisify(require("child_process").exec);
 
 export async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function waitForBlocks(chainId: string) {
+export async function waitForChain(account: Account) {
   const secretjs = new SecretNetworkClient({
     url: "http://localhost:1317",
-    chainId,
+    chainId: "secretdev-1",
+    wallet: account.wallet,
+    walletAddress: account.address,
   });
 
-  console.log(`Waiting for blocks on ${chainId}...`);
   while (true) {
     try {
-      const { block } = await secretjs.query.tendermint.getLatestBlock({});
+      const tx = await secretjs.tx.bank.send({
+        amount: coinsFromString("1uscrt"),
+        from_address: account.address,
+        to_address: account.address,
+      });
 
-      if (Number(block?.header?.height) >= 1) {
-        console.log(`Current block on ${chainId}: ${block!.header!.height}`);
+      if (tx.code === TxResultCode.Success) {
         break;
       }
-    } catch (e) {}
-    await sleep(100);
+    } catch (e) {
+      // console.error(e);
+    }
+    await sleep(250);
   }
 }
 
@@ -45,7 +52,7 @@ type Account = {
 
 const accounts: Account[] = [];
 
-let contract: string;
+let contract_address: string;
 
 beforeAll(async () => {
   jest.spyOn(console, "warn").mockImplementation(() => {});
@@ -74,20 +81,26 @@ beforeAll(async () => {
     });
   }
 
-  await waitForBlocks("secretdev-1");
+  await waitForChain(accounts[0]);
 
-  const wasmBytes = fs.readFileSync(
-    `${__dirname}/../contract.wasm.gz`
-  ) as Uint8Array;
+  // set block time to 300ms
+  await exec(
+    `docker exec localsecret sed -E -i '/timeout_(propose|prevote|precommit|commit)/s/[0-9]+m?s/100ms/' .secretd/config/config.toml`
+  );
+  await exec(`docker restart localsecret`);
 
-  console.log("Storing contract on-chain...");
+  await waitForChain(accounts[0]);
+}, 1000 * 60 * 60);
 
+test("benchmark", async () => {
   const { secretjs } = accounts[0];
 
   let tx = await secretjs.tx.compute.storeCode(
     {
       sender: secretjs.address,
-      wasm_byte_code: wasmBytes,
+      wasm_byte_code: fs.readFileSync(
+        `${__dirname}/../contract.wasm.gz`
+      ) as Uint8Array,
       source: "",
       builder: "",
     },
@@ -101,101 +114,101 @@ beforeAll(async () => {
 
   const { code_id } = MsgStoreCodeResponse.decode(tx.data[0]);
 
-  tx = await secretjs.tx.compute.instantiateContract(
-    {
-      sender: secretjs.address,
-      code_id,
-      init_msg: {
-        number_of_users: 7,
-        signing_threshold: 2,
-      },
-      label: String(Date.now()),
-    },
-    { gasLimit: 1_000_000 }
-  );
-
-  if (tx.code !== 0) {
-    console.log(tx.rawLog);
-  }
-  expect(tx.code).toBe(0);
-
-  contract = MsgInstantiateContractResponse.decode(tx.data[0]).address;
-}, 90_000);
-
-type Share = {
-  id: number;
-  data: string; // hex string
-  threshold: number;
-  share_count: number;
-};
-
-describe("KeyGen", () => {
-  test("happy path", async () => {
-    const { secretjs } = accounts[0];
-
-    const keyPair = secp256k1.genKeyPair();
-    const pubkeyHex = keyPair.getPublic("hex").slice(2); // raw pubkey
-    const privkeyHex = keyPair.getPrivate("hex");
-
-    const rawShares = sss.create(2, 9, privkeyHex);
-    const parsedShares: Share[] = rawShares.map((share: string, i: number) => ({
-      id: i + 1,
-      data: "0000000000000000000000000000000000000000000000000000000000000000" /* toHex(
-        fromBase64(share.substring(0, 44).replace(/_/g, "/").replace(/-/g, "+"))
-      ) */,
-      threshold: 2,
-      share_count: 9,
-    }));
-
-    const tx = await secretjs.tx.compute.executeContract(
-      {
-        sender: secretjs.address,
-        contract_address: contract,
-        msg: {
-          key_gen: {
-            user_public_key: pubkeyHex, // raw pubkey - 64 bytes
-            user_secret_key_shares: parsedShares,
+  for (let n = 2; n < 16; n++) {
+    for (let t = 1; t < n; t++) {
+      tx = await secretjs.tx.compute.instantiateContract(
+        {
+          sender: secretjs.address,
+          code_id,
+          init_msg: {
+            number_of_users: n,
+            signing_threshold: t,
           },
+          label: String(Date.now()),
         },
-      },
-      { gasLimit: 1_000_000 }
-    );
+        { gasLimit: 1_000_000 }
+      );
 
-    if (tx.code !== 0) {
-      console.log(tx.rawLog);
+      if (tx.code !== 0) {
+        console.log(tx.rawLog);
+      }
+      expect(tx.code).toBe(0);
+
+      console.log(
+        `${n},${t},init,${
+          JSON.stringify({
+            number_of_users: n,
+            signing_threshold: t,
+          }).length
+        },${tx.gasUsed}`
+      );
+
+      contract_address = MsgInstantiateContractResponse.decode(
+        tx.data[0]
+      ).address;
+
+      let input = fs.readFileSync(
+        `${__dirname}/../contract/${n}_${t}_keygen.json`,
+        {
+          encoding: "utf-8",
+        }
+      );
+      tx = await secretjs.tx.compute.executeContract(
+        {
+          sender: secretjs.address,
+          contract_address,
+          msg: JSON.parse(input),
+        },
+        { gasLimit: 1_000_000 }
+      );
+
+      if (tx.code !== 0) {
+        console.log(tx.rawLog);
+      }
+      expect(tx.code).toBe(0);
+
+      console.log(`${n},${t},keygen,${input.length},${tx.gasUsed}`);
+
+      input = fs.readFileSync(
+        `${__dirname}/../contract/${n}_${t}_presign.json`,
+        {
+          encoding: "utf-8",
+        }
+      );
+      tx = await secretjs.tx.compute.executeContract(
+        {
+          sender: secretjs.address,
+          contract_address,
+          msg: JSON.parse(input),
+        },
+        { gasLimit: 1_000_000 }
+      );
+
+      if (tx.code !== 0) {
+        console.log(tx.rawLog);
+      }
+      expect(tx.code).toBe(0);
+
+      console.log(`${n},${t},presig,${input.length},${tx.gasUsed}`);
+
+      input = fs.readFileSync(`${__dirname}/../contract/${n}_${t}_sign.json`, {
+        encoding: "utf-8",
+      });
+      tx = await secretjs.tx.compute.executeContract(
+        {
+          sender: secretjs.address,
+          contract_address,
+          msg: JSON.parse(input),
+        },
+        { gasLimit: 1_000_000 }
+      );
+
+      if (tx.code !== 0) {
+        console.log(tx.rawLog);
+      }
+      expect(tx.code).toBe(0);
+
+      console.log(`${n},${t},sign,${input.length},${tx.gasUsed}`);
     }
-    expect(tx.code).toBe(0);
-
-    console.log("Keygen gas:", tx.gasUsed);
-  });
-
-  test.skip("e.g. wrong user_public_key format", async () => {});
-
-  test.skip("e.g. wrong user_secret_key_shares", async () => {});
-});
-
-describe("CreatePresig", () => {
-  test.skip("happy path", async () => {});
-
-  test.skip("e.g. wrong user_index", async () => {});
-
-  test.skip("e.g. wrong k_user_shares", async () => {});
-
-  test.skip("e.g. wrong a_user_shares", async () => {});
-
-  test.skip("e.g. wrong user_zero_shares1", async () => {});
-
-  test.skip("e.g. wrong user_zero_shares2", async () => {});
-
-  test.skip("e.g. wrong public_instance_key", async () => {});
-});
-
-describe("Sign", () => {
-  test.skip("happy path", async () => {});
-
-  test.skip("e.g. wrong user_index", async () => {});
-
-  test.skip("e.g. wrong user_sig_num_share", async () => {});
-
-  test.skip("e.g. wrong user_sig_denom_share", async () => {});
+  }
 });
