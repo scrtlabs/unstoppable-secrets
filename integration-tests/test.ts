@@ -90,125 +90,134 @@ beforeAll(async () => {
   await exec(`docker restart localsecret`);
 
   await waitForChain(accounts[0]);
-}, 1000 * 60 * 60);
-
-test("benchmark", async () => {
-  const { secretjs } = accounts[0];
-
-  let tx = await secretjs.tx.compute.storeCode(
-    {
-      sender: secretjs.address,
-      wasm_byte_code: fs.readFileSync(
-        `${__dirname}/../contract.wasm.gz`
-      ) as Uint8Array,
-      source: "",
-      builder: "",
-    },
-    { gasLimit: 2_000_000 }
-  );
-
-  if (tx.code !== 0) {
-    console.log(tx.rawLog);
-  }
-  expect(tx.code).toBe(0);
-
-  const { code_id } = MsgStoreCodeResponse.decode(tx.data[0]);
-
-  for (let n = 2; n < 16; n++) {
-    for (let t = 1; t < n; t++) {
-      tx = await secretjs.tx.compute.instantiateContract(
-        {
-          sender: secretjs.address,
-          code_id,
-          init_msg: {
-            number_of_users: n,
-            signing_threshold: t,
-          },
-          label: String(Date.now()),
-        },
-        { gasLimit: 1_000_000 }
-      );
-
-      if (tx.code !== 0) {
-        console.log(tx.rawLog);
-      }
-      expect(tx.code).toBe(0);
-
-      console.log(
-        `${n},${t},init,${
-          JSON.stringify({
-            number_of_users: n,
-            signing_threshold: t,
-          }).length
-        },${tx.gasUsed}`
-      );
-
-      contract_address = MsgInstantiateContractResponse.decode(
-        tx.data[0]
-      ).address;
-
-      let input = fs.readFileSync(
-        `${__dirname}/../contract/${n}_${t}_keygen.json`,
-        {
-          encoding: "utf-8",
-        }
-      );
-      tx = await secretjs.tx.compute.executeContract(
-        {
-          sender: secretjs.address,
-          contract_address,
-          msg: JSON.parse(input),
-        },
-        { gasLimit: 1_000_000 }
-      );
-
-      if (tx.code !== 0) {
-        console.log(tx.rawLog);
-      }
-      expect(tx.code).toBe(0);
-
-      console.log(`${n},${t},keygen,${input.length},${tx.gasUsed}`);
-
-      input = fs.readFileSync(
-        `${__dirname}/../contract/${n}_${t}_presign.json`,
-        {
-          encoding: "utf-8",
-        }
-      );
-      tx = await secretjs.tx.compute.executeContract(
-        {
-          sender: secretjs.address,
-          contract_address,
-          msg: JSON.parse(input),
-        },
-        { gasLimit: 1_000_000 }
-      );
-
-      if (tx.code !== 0) {
-        console.log(tx.rawLog);
-      }
-      expect(tx.code).toBe(0);
-
-      console.log(`${n},${t},presig,${input.length},${tx.gasUsed}`);
-
-      input = fs.readFileSync(`${__dirname}/../contract/${n}_${t}_sign.json`, {
-        encoding: "utf-8",
-      });
-      tx = await secretjs.tx.compute.executeContract(
-        {
-          sender: secretjs.address,
-          contract_address,
-          msg: JSON.parse(input),
-        },
-        { gasLimit: 1_000_000 }
-      );
-
-      if (tx.code !== 0) {
-        console.log(tx.rawLog);
-      }
-      expect(tx.code).toBe(0);
-
-      console.log(`${n},${t},sign,${input.length},${tx.gasUsed}`);
-    }
-  }
 });
+
+test(
+  "benchmark",
+  async () => {
+    const { secretjs } = accounts[0];
+
+    let tx = await secretjs.tx.compute.storeCode(
+      {
+        sender: secretjs.address,
+        wasm_byte_code: fs.readFileSync(
+          `${__dirname}/../contract.wasm.gz`
+        ) as Uint8Array,
+        source: "",
+        builder: "",
+      },
+      { gasLimit: 2_000_000 }
+    );
+
+    if (tx.code !== 0) {
+      console.log(tx.rawLog);
+    }
+    expect(tx.code).toBe(0);
+
+    const { code_id } = MsgStoreCodeResponse.decode(tx.data[0]);
+
+    for (let n = 2; n < 16; n++) {
+      for (let t = 1; t < n; t++) {
+        tx = await secretjs.tx.compute.instantiateContract(
+          {
+            sender: secretjs.address,
+            code_id,
+            init_msg: {
+              number_of_users: n,
+              signing_threshold: t,
+            },
+            label: String(Date.now()),
+          },
+          { gasLimit: 1_000_000 }
+        );
+
+        if (tx.code !== 0) {
+          console.log(tx.rawLog);
+        }
+        expect(tx.code).toBe(0);
+
+        console.log(
+          `${n},${t},init,${
+            JSON.stringify({
+              number_of_users: n,
+              signing_threshold: t,
+            }).length
+          },${tx.gasUsed}`
+        );
+
+        contract_address = MsgInstantiateContractResponse.decode(
+          tx.data[0]
+        ).address;
+
+        let input = fs.readFileSync(
+          `${__dirname}/../contract/${n}_${t}_keygen.json`,
+          {
+            encoding: "utf-8",
+          }
+        );
+        tx = await secretjs.tx.compute.executeContract(
+          {
+            sender: secretjs.address,
+            contract_address,
+            msg: JSON.parse(input),
+          },
+          { gasLimit: 1_000_000 }
+        );
+
+        if (tx.code !== 0) {
+          console.log(tx.rawLog);
+        }
+        expect(tx.code).toBe(0);
+
+        console.log(`${n},${t},keygen,${input.length},${tx.gasUsed}`);
+
+        input = fs.readFileSync(
+          `${__dirname}/../contract/${n}_${t}_presign.json`,
+          {
+            encoding: "utf-8",
+          }
+        );
+        tx = await secretjs.tx.compute.executeContract(
+          {
+            sender: secretjs.address,
+            contract_address,
+            msg: JSON.parse(input),
+          },
+          { gasLimit: 1_000_000 }
+        );
+
+        if (tx.code !== 0) {
+          console.log(tx.rawLog);
+        }
+        expect(tx.code).toBe(0);
+
+        console.log(`${n},${t},presig,${input.length},${tx.gasUsed}`);
+
+        for (let i = 0; i < n; i++) {
+          input = fs.readFileSync(
+            `${__dirname}/../contract/${n}_${t}_sign_${i}.json`,
+            {
+              encoding: "utf-8",
+            }
+          );
+          tx = await secretjs.tx.compute.executeContract(
+            {
+              sender: secretjs.address,
+              contract_address,
+              msg: JSON.parse(input),
+            },
+            { gasLimit: 1_000_000 }
+          );
+
+          if (tx.code !== 0) {
+            console.log(tx.rawLog);
+          }
+          expect(tx.code).toBe(0);
+
+          console.log(`${n},${t},sign_${i + 1},${input.length},${tx.gasUsed}`);
+        }
+      }
+    }
+  },
+  1000 * 60 * 10
+);

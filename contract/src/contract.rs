@@ -705,10 +705,9 @@ mod tests {
                     let now = Instant::now();
                     let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
                     let elapsed = now.elapsed().as_nanos();
-                    println!("{},{},sign,{}", n, t, elapsed);
-                    let mut file = File::create(format!("{}_{}_sign.json", n, t)).unwrap();
+                    println!("{},{},sign_{},{}", n, t, i + 1, elapsed);
+                    let mut file = File::create(format!("{}_{}_sign_{}.json", n, t, i)).unwrap();
                     file.write_all(x.unwrap().as_slice()).unwrap();
-                    break;
                 }
             }
         }
