@@ -361,7 +361,7 @@ fn execute_sign(
 
     // Calculate v
     // Source: https://ethereum.stackexchange.com/a/118342/12112
-    let R = state.public_key.clone();
+    let R = state.public_instance_key.clone();
     let recovery_id = match (
         R.y().is_even(),
         R.x().to_big_int() > curve_order.to_big_int(),
