@@ -199,3 +199,86 @@ describe("Sign", () => {
 
   test.skip("e.g. wrong user_sig_denom_share", async () => {});
 });
+
+function mod(a: number, b: number): number {
+  return ((a % b) + b) % b;
+}
+
+function getRandomCoefficients(
+  k: number,
+  secret: number,
+  prime: number
+): number[] {
+  const coefficients = [secret];
+  for (let i = 1; i < k; i++) {
+    let coef = Math.floor(Math.random() * (prime - 1)) + 1; // Random coefficient between 1 and p-1
+    coefficients.push(coef);
+  }
+  return coefficients;
+}
+
+function generateShares(
+  k: number,
+  n: number,
+  secret: number,
+  prime: number
+): { x: number; y: number }[] {
+  const coefficients = getRandomCoefficients(k, secret, prime);
+  const shares = [];
+  for (let i = 1; i <= n; i++) {
+    let x = i;
+    let y = coefficients[0];
+    for (let j = 1; j < k; j++) {
+      y = mod(y + coefficients[j] * Math.pow(x, j), prime);
+    }
+    shares.push({ x, y });
+  }
+  return shares;
+}
+
+function interpolate(
+  shares: { x: number; y: number }[],
+  prime: number
+): number {
+  let result = 0;
+  for (let i = 0; i < shares.length; i++) {
+    let numerator = 1;
+    let denominator = 1;
+    for (let j = 0; j < shares.length; j++) {
+      if (i === j) continue;
+      numerator = mod(numerator * (0 - shares[j].x), prime);
+      denominator = mod(denominator * (shares[i].x - shares[j].x), prime);
+    }
+    result = mod(
+      result + shares[i].y * numerator * modInverse(denominator, prime),
+      prime
+    );
+  }
+  return result;
+}
+
+function modInverse(a: number, b: number): number {
+  const b0 = b;
+  let x0 = 0;
+  let x1 = 1;
+
+  if (b === 1) {
+    return 1;
+  }
+
+  while (a > 1) {
+    const q = Math.floor(a / b);
+    let t = b;
+    b = mod(a, b);
+    a = t;
+    t = x0;
+    x0 = x1 - q * x0;
+    x1 = t;
+  }
+
+  if (x1 < 0) {
+    x1 = x1 + b0;
+  }
+
+  return x1;
+}

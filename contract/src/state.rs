@@ -38,7 +38,7 @@ pub struct State {
     pub sk_user_shares: Vec<Share<Secp256k1Scalar>>,
     pub sk_chain_shares: Vec<Share<Secp256k1Scalar>>,
     pub sk_chain_shares_final: Vec<Share<Secp256k1Scalar>>,
-    
+
     //// Presig data
     // k, R=k*G (instance key pair)
     pub k_chain_shares: Vec<Share<Secp256k1Scalar>>,
