@@ -12,7 +12,6 @@ use crate::rng::Prng;
 use crate::state::{load_state, save_state, State};
 use ethereum_types::H160;
 use rlp::{Encodable, RlpStream};
-use sha3::{Digest, Keccak256};
 use std::str::FromStr;
 
 use tx_from_scratch::Transaction;
@@ -316,7 +315,7 @@ fn execute_sign(
         chain_id: tx.chain_id,
     };
 
-    let message_arr = Keccak256::digest(&tx.rlp_bytes().to_vec());
+    let message_arr = tx.hash();
     let m = Secp256k1Scalar::from_slice(&message_arr).unwrap();
 
     let r = state.public_instance_key.x();
@@ -360,15 +359,23 @@ fn execute_sign(
     )
     .expect("converting curve order from hex string to Secp256k1Scalar");
 
-    let recovery_id = (if state.public_instance_key.x().to_big_int() > curve_order.to_big_int() {
-        2
-    } else {
-        0
-    }) | (if state.public_instance_key.y().is_even() {
-        0
-    } else {
-        1
-    });
+    // Calculate v
+    // Source: https://ethereum.stackexchange.com/a/118342/12112
+    let R = state.public_key.clone();
+    let recovery_id = match (
+        R.y().is_even(),
+        R.x().to_big_int() > curve_order.to_big_int(),
+    ) {
+        // Is R.y even and R.x less than the curve order n: recovery_id := 0
+        (true, false) => 0,
+        // Is R.y odd and R.x less than the curve order n: recovery_id := 1
+        (false, false) => 1,
+        // Is R.y even and R.x more than the curve order n: recovery_id := 2
+        (true, true) => 2,
+        // Is R.y odd and R.x more than the curve order n: recovery_id := 3
+        (false, true) => 3,
+    };
+
     let v = recovery_id as u64 + (tx.chain_id * 2 + 35);
 
     let mut signed_tx = RlpStream::new();
@@ -634,7 +641,6 @@ mod tests {
 
         // Get all values..
         let mut sk_shares = vec![];
-        let mut pk = Secp256k1Point::default();
 
         for i in 0..=num_of_shares - 1 {
             // read shares for each party
@@ -647,7 +653,6 @@ mod tests {
             let decoded_response: ReadKeyGenResponse = from_binary(&resp).unwrap();
 
             let sk_share = decoded_response.sk_user_share + decoded_response.sk_chain_share;
-            pk = Secp256k1Point::from_str(&decoded_response.public_key).unwrap();
             sk_shares.push(sk_share);
         }
 
@@ -734,7 +739,9 @@ mod tests {
 
             let res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-            println!("{:?}", res.data);
+            if res.data.is_some() {
+                println!("signed eth tx: {:?}", res.data.unwrap());
+            }
         }
     }
 
