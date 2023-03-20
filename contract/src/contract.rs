@@ -4,6 +4,7 @@ use cosmwasm_std::{
 };
 
 use ethereum_tx_sign::{EcdsaSig, LegacyTransaction, Transaction};
+use libsecp256k1::{PublicKey, PublicKeyFormat, Signature};
 use scrt_sss::{ECPoint, ECScalar, Secp256k1Point, Secp256k1Scalar, Share};
 
 use crate::msg::{
@@ -101,8 +102,7 @@ fn keygen(
     }
 
     // generate chain secret key
-    let silly = env.block.time.nanos().to_be_bytes();
-    let mut rng = Prng::new(b"hello", silly.as_slice());
+    let mut rng = Prng::new(b"hello", &[]);
     let sk_chain = Secp256k1Scalar::random(&mut rng);
 
     // generate chain public key
@@ -186,8 +186,7 @@ fn create_presig(
 
     // rand = info.random;
     // let rng = Prng::new(rand.as_slice(), b"");
-    let silly = env.block.time.nanos().to_be_bytes();
-    let mut rng = Prng::new(b"hello", silly.as_slice());
+    let mut rng = Prng::new(b"gm", &[]);
     let k_chain = Secp256k1Scalar::random(&mut rng);
     let a_chain = Secp256k1Scalar::random(&mut rng);
 
@@ -354,29 +353,20 @@ fn execute_sign(
     .expect("converting curve order from hex string to Secp256k1Scalar");
 
     println!(
-        "state.public_instance_key: {}",
+        "state.public_instance_key aka nonce: 0x{}",
         state.public_instance_key.clone().to_string()
     );
-    println!("state.public_key: {}", state.public_key.clone().to_string());
+    println!(
+        "state.public_key: 0x{}",
+        state.public_key.clone().to_string()
+    );
 
     // Calculate v
     // Source: https://ethereum.stackexchange.com/a/118342/12112
     let R = state.public_instance_key.clone();
-    let recovery_id = match (
-        R.y().is_even(),
-        R.x().to_big_int() > curve_order.to_big_int(),
-    ) {
-        // Is R.y even and R.x less than the curve order n: recovery_id := 0
-        (true, false) => 0,
-        // Is R.y odd and R.x less than the curve order n: recovery_id := 1
-        (false, false) => 1,
-        // Is R.y even and R.x more than the curve order n: recovery_id := 2
-        (true, true) => 2,
-        // Is R.y odd and R.x more than the curve order n: recovery_id := 3
-        (false, true) => 3,
-    };
+    let recovery_id: u8 = if R.y().is_even() { 0 } else { 1 };
 
-    let v = recovery_id as u64 + (tx.chain * 2 + 35);
+    let v = recovery_id as u64 + 35 + tx.chain * 2;
 
     let signed_tx = tx.sign(&EcdsaSig {
         v,
@@ -384,8 +374,40 @@ fn execute_sign(
         s: s.to_raw().to_vec(),
     });
 
-    println!("r: {}", hex::encode(r.to_raw()));
-    println!("s: {}", hex::encode(s.to_raw()));
+    println!("r: 0x{}", hex::encode(r.to_raw()));
+    println!("s: 0x{}", hex::encode(s.to_raw()));
+    println!("v: {} (0x{})", v, hex::encode((v as u8).to_be_bytes()));
+
+    // check signature
+
+    let sig_for_verify = &Signature {
+        r: r.value,
+        s: s.value,
+    }
+    .serialize();
+    let pk_for_verify =
+        &PublicKey::parse_slice(&state.public_key.to_slice(), Some(PublicKeyFormat::Raw))
+            .unwrap()
+            .serialize_compressed();
+
+    let is_verified = deps
+        .api
+        .secp256k1_verify(&message_arr, sig_for_verify, pk_for_verify)
+        .unwrap();
+
+    if is_verified {
+        println!("good signature");
+    } else {
+        println!("bad signature");
+    }
+
+    println!("recovery_id: {}", recovery_id);
+    let recovered_pubkey = deps
+        .api
+        .secp256k1_recover_pubkey(&message_arr, sig_for_verify, recovery_id)
+        .unwrap();
+
+    println!("recovered_pubkey: 0x{}", hex::encode(recovered_pubkey));
 
     // TODO: we need to be able to store multiple signatures on-chain so other parties can read them. This is temporary
     state.sig = s.clone();
@@ -490,7 +512,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 mod tests {
     use super::*;
 
-    use base32::encode;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary, Uint128};
     // use rand::{RngCore, CryptoRng};
@@ -564,7 +585,7 @@ mod tests {
         threshold: u8,
         privkey: Secp256k1Scalar,
     ) -> (Vec<Share<Secp256k1Scalar>>, Secp256k1Scalar, Secp256k1Point) {
-        let mut rng = rand::thread_rng();
+        let mut rng = Prng::new(b"gm", &[]);
 
         let pubkey = Secp256k1Point::generate(&privkey);
 
@@ -631,7 +652,7 @@ mod tests {
         // Keygen
 
         // privkey 0000000000000000000000000000000000000000000000000000000000000007
-        // => address 0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb
+        // => address 0x4D8846d36D5349F14eC887a7701E48475453932A
 
         let (sk_user_shares, sk_user, pk_user) =
             client_create_share_from_privkey(total_shares, threshold, Secp256k1Scalar::from_num(7));
@@ -641,11 +662,11 @@ mod tests {
         };
 
         println!(
-            "privkey: {}",
+            "privkey: 0x{}",
             hex::encode(Secp256k1Scalar::from_num(7).to_raw())
         );
-        println!("sk_user: {}", hex::encode(sk_user.to_raw()));
-        println!("pk_user: {}", pk_user.to_string());
+        println!("sk_user: 0x{}", hex::encode(sk_user.to_raw()));
+        println!("pk_user: 0x{}", pk_user.to_string());
 
         let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
@@ -689,10 +710,10 @@ mod tests {
 
         let tx = LegacyTransaction {
             nonce: 1,
-            gas_price: 0_000_000_014_000_000_000, // 14 Gwei (0.000000014000000000 ETH),
+            gas_price: 0_000_001_140_000_000_000, // 1140 Gwei (0.000001140000000000 ETH),
             gas: 21000,
             to: Some(
-                H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
+                H160::from_str("0x4D8846d36D5349F14eC887a7701E48475453932A")
                     .expect("converting 'to' into bytes")
                     .to_fixed_bytes(),
             ),
@@ -738,10 +759,10 @@ mod tests {
                 user_sig_denom_share: sig_denom_share,
                 tx: EthTx {
                     nonce: Uint128::new(1),
-                    gas_price: Uint128::new(0_000_000_014_000_000_000), // 14 Gwei (0.000000014000000000 ETH),
+                    gas_price: Uint128::new(0_000_001_140_000_000_000), // 14 Gwei (0.000001140000000000 ETH),
                     gas: Uint128::new(21000),
                     to: Binary::from(
-                        H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
+                        H160::from_str("0x4D8846d36D5349F14eC887a7701E48475453932A")
                             .expect("converting 'to' into bytes")
                             .to_fixed_bytes(),
                     ),
@@ -754,7 +775,7 @@ mod tests {
             let res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
             if res.data.is_some() {
-                println!("signed eth tx: {:?}", res.data.unwrap());
+                println!("signed eth tx: 0x{}", hex::encode(res.data.unwrap().0));
             }
         }
     }
