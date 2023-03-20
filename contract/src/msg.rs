@@ -1,5 +1,4 @@
 use cosmwasm_std::{Binary, Uint128};
-use ethereum_tx_sign::AccessList;
 use scrt_sss::{Secp256k1Scalar, Share};
 use serde::{Deserialize, Serialize};
 

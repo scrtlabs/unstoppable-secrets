@@ -85,7 +85,7 @@ pub fn execute(
 
 fn keygen(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     _info: MessageInfo,
     user_public_key: String,
     user_secret_key_shares: Vec<Share<Secp256k1Scalar>>,
@@ -139,7 +139,7 @@ fn keygen(
 
 fn create_presig(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     _info: MessageInfo,
     user_public_instance_key: String,
     k_user_shares: Vec<Share<Secp256k1Scalar>>,
@@ -265,15 +265,15 @@ fn create_presig(
 
 fn execute_sign(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     _info: MessageInfo,
-    user_index: u32,
+    _user_index: u32,
     user_sig_num_share: Share<Secp256k1Scalar>,
     user_sig_denom_share: Share<Secp256k1Scalar>,
     tx: EthTx,
 ) -> Result<Response, CustomContractError> {
     let mut state = load_state(deps.storage)?;
-    let total_shares = state.num_of_users + state.threshold;
+    let _total_shares = state.num_of_users + state.threshold;
 
     // Store user's shares
     state.sig_num_shares.push(user_sig_num_share);
@@ -344,14 +344,6 @@ fn execute_sign(
     let s2 = scrt_sss::open(state.sig_denom_shares.clone()).unwrap();
     let s = s1 * s2.inv();
 
-    // TODO figure out this v
-    // let v = v.to_i32() as u64 + (self.chain_id * 2 + 35);
-
-    let curve_order = Secp256k1Scalar::from_str(
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
-    )
-    .expect("converting curve order from hex string to Secp256k1Scalar");
-
     println!(
         "state.public_instance_key aka nonce: 0x{}",
         state.public_instance_key.clone().to_string()
@@ -363,6 +355,7 @@ fn execute_sign(
 
     // Calculate v
     // Source: https://ethereum.stackexchange.com/a/118342/12112
+    #[allow(non_snake_case)]
     let R = state.public_instance_key.clone();
     let recovery_id: u8 = if R.y().is_even() { 0 } else { 1 };
 
@@ -395,11 +388,13 @@ fn execute_sign(
         .secp256k1_verify(&message_arr, sig_for_verify, pk_for_verify)
         .unwrap();
 
+    println!("********************************");
     if is_verified {
         println!("good signature");
     } else {
         println!("bad signature");
     }
+    println!("********************************");
 
     println!("recovery_id: {}", recovery_id);
     let recovered_pubkey = deps
@@ -604,7 +599,7 @@ mod tests {
 
         let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
 
-        let (sk_user_shares, sk_user, pk_user) = client_create_share(total_shares, threshold);
+        let (sk_user_shares, _sk_user, pk_user) = client_create_share(total_shares, threshold);
         let msg = ExecuteMsg::KeyGen {
             user_public_key: pk_user.to_string(),
             user_secret_key_shares: sk_user_shares,
@@ -690,8 +685,8 @@ mod tests {
         //// Presig
 
         // Generate 4 values and their shares: k_user, a_user, 0, 0
-        let (k_user_shares, k_user, k_user_public) = client_create_share(total_shares, threshold);
-        let (a_user_shares, a_user) = client_create_share_no_public(total_shares, threshold);
+        let (k_user_shares, _k_user, k_user_public) = client_create_share(total_shares, threshold);
+        let (a_user_shares, _a_user) = client_create_share_no_public(total_shares, threshold);
         let user_zero_shares1 = client_create_share_no_secret(total_shares, threshold * 2);
         let user_zero_shares2 = client_create_share_no_secret(total_shares, threshold * 2);
 
@@ -709,15 +704,15 @@ mod tests {
         //// Sign
 
         let tx = LegacyTransaction {
-            nonce: 1,
-            gas_price: 0_000_001_140_000_000_000, // 1140 Gwei (0.000001140000000000 ETH),
-            gas: 21000,
+            nonce: 2,
+            gas_price: 40_000_000_000, // 40 Gwei
+            gas: 21_000,
             to: Some(
                 H160::from_str("0x4D8846d36D5349F14eC887a7701E48475453932A")
                     .expect("converting 'to' into bytes")
                     .to_fixed_bytes(),
             ),
-            value: 1, // (0.000000000000000001 ETH)
+            value: 0_000_000_000_000_000_001,
             data: vec![],
             chain: 1, // Mainnet
         };
@@ -728,10 +723,10 @@ mod tests {
         for i in 0..=num_of_shares - 1 {
             // read shares for each party
 
-            let msg = QueryMsg::ReadPresig {
+            let query_msg = QueryMsg::ReadPresig {
                 user_index: i as u32,
             };
-            let resp = query(deps.as_ref(), mock_env(), msg).unwrap();
+            let resp = query(deps.as_ref(), mock_env(), query_msg).unwrap();
 
             let decoded_response: ReadPresigResponse = from_binary(&resp).unwrap();
 
@@ -753,99 +748,34 @@ mod tests {
             let sig_denom_share = k_share.clone() * a_share.clone().data - zero_share2.clone();
             // println!("Shares ids are: {:?}, {:?}, {:?}", sk_share.id, sig_num_share.id, sig_denom_share.id);
 
-            let msg = ExecuteMsg::Sign {
+            let exec_msg = ExecuteMsg::Sign {
                 user_index: i as u32,
                 user_sig_num_share: sig_num_share,
                 user_sig_denom_share: sig_denom_share,
                 tx: EthTx {
-                    nonce: Uint128::new(1),
-                    gas_price: Uint128::new(0_000_001_140_000_000_000), // 14 Gwei (0.000001140000000000 ETH),
-                    gas: Uint128::new(21000),
+                    nonce: Uint128::new(2),
+                    gas_price: Uint128::new(40_000_000_000), // 40 Gwei
+                    gas: Uint128::new(21_000),
                     to: Binary::from(
                         H160::from_str("0x4D8846d36D5349F14eC887a7701E48475453932A")
                             .expect("converting 'to' into bytes")
                             .to_fixed_bytes(),
                     ),
-                    value: Uint128::new(1), // (0.000000000000000001 ETH)
+                    value: Uint128::new(0_000_000_000_000_000_001),
                     data: vec![],
                     chain: 1, // Mainnet
                 },
             };
 
-            let res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+            let res = execute(deps.as_mut(), mock_env(), info.clone(), exec_msg).unwrap();
 
             if res.data.is_some() {
+                println!("================================================");
                 println!("signed eth tx: 0x{}", hex::encode(res.data.unwrap().0));
+                println!("================================================");
             }
         }
     }
 
-    use ethereum_tx_sign::Transaction;
-    use secp256k1::hashes::sha256;
-    use secp256k1::rand::rngs::OsRng;
-    use secp256k1::{Message as SecpMessage, Secp256k1};
-
-    #[test]
-    fn secp256k1_test() {
-        let secp = Secp256k1::new();
-        let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
-        let message = SecpMessage::from_hashed_data::<sha256::Hash>("gm".as_bytes());
-
-        let sig = secp.sign_ecdsa(&message, &secret_key);
-        assert!(secp.verify_ecdsa(&message, &sig, &public_key).is_ok());
-    }
-
-    use libsecp256k1::*;
-    #[test]
-    fn libsecp256k1_test() {
-        let secp256k1 = Secp256k1::new();
-
-        let message_arr = [6u8; 32];
-        let (secp_privkey, secp_pubkey) = secp256k1.generate_keypair(&mut OsRng);
-        let pubkey_a = secp_pubkey.serialize_uncompressed();
-        assert_eq!(pubkey_a.len(), 65);
-        let pubkey = PublicKey::parse(&pubkey_a).unwrap();
-        let mut seckey_a = [0u8; 32];
-        for i in 0..32 {
-            seckey_a[i] = secp_privkey[i];
-        }
-
-        let message = Message::parse(&message_arr);
-
-        let seckey = SecretKey::parse(&seckey_a).unwrap();
-        let (sig, recid) = sign(&message, &seckey);
-
-        // Self verify
-        assert!(verify(&message, &sig, &pubkey));
-        println!("The value of (r,s)) is {:?}", sig);
-    }
-
-    // GOAL: pure math signature works with ecdsa.verify from a common library
-    #[test]
-    fn sign_and_verify_test() {
-        // Generate pure math (sk, pk)
-        let sk_math = Secp256k1Scalar::random(&mut OsRng);
-        let pk_math = Secp256k1Point::generate(&sk_math);
-
-        let message_arr = [6u8; 32];
-        let message_math = Secp256k1Scalar::from_slice(&message_arr).unwrap();
-
-        // Generate sig = (r, s) using pure math
-        let k = Secp256k1Scalar::random(&mut OsRng);
-        let R = Secp256k1Point::generate(&k);
-        let r = R.x();
-        let s = (message_math + r.clone() * sk_math) * k.inv();
-        let sig = Signature {
-            r: r.value,
-            s: s.value,
-        };
-
-        // Try to verify sig with secp256k1 verify
-        // let secp256k1 = Secp256k1::new();
-        let message = Message::parse(&message_arr);
-        let pk = PublicKey::parse_slice(&pk_math.to_slice(), Some(PublicKeyFormat::Raw)).unwrap();
-
-        assert!(verify(&message, &sig, &pk));
-        println!("The value of (r,s)) is {:?}", sig);
-    }
+    use ethereum_tx_sign::{LegacyTransaction, Transaction};
 }
