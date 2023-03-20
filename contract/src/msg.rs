@@ -1,7 +1,7 @@
-use ethereum_types::H160;
+use cosmwasm_std::{Binary, Uint128};
+use ethereum_tx_sign::AccessList;
 use scrt_sss::{Secp256k1Scalar, Share};
 use serde::{Deserialize, Serialize};
-use tx_from_scratch::Transaction;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct InstantiateMsg {
@@ -97,46 +97,21 @@ pub struct ReadPresigResponse {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct EthTx {
-    /// Nonce of your next transaction
-    pub nonce: u128,
-
+    /// Chain ID
+    pub chain: u64,
+    /// Nonce
+    pub nonce: Uint128,
     /// Gas price
-    pub gas_price: u128,
-
-    /// Gas or Gas_limit. So amount of gas you are willing to spend
-    pub gas: u128,
-
-    /// Address you want to transact with. If you want to deploy a contract, `to` should be None.
-    ///
-    /// To convert your address from string to [u8; 20] you will have to use ethereum_types crate.
-    /// ```no_run
-    /// use ethereum_types::H160;
-    /// use std::str::FromStr;
-    ///
-    /// let address: [u8; 20] = H160::from_str(&"/* your address */").unwrap().to_fixed_bytes();
-    /// ```
-    pub to: String,
-
-    /// Amount of ether you want to send
-    pub value: u128,
-
-    /// If you want to interact or deploy smart contract add the bytecode here
+    pub max_priority_fee_per_gas: Uint128,
+    pub max_fee_per_gas: Uint128,
+    /// Gas limit
+    pub gas: Uint128,
+    /// Recipient (None when contract creation)
+    pub to: Binary,
+    /// Transfered value
+    pub value: Uint128,
+    /// Input data
     pub data: Vec<u8>,
-
-    /// Chain id for the target chain. Mainnet = 1
-    pub chain_id: u64,
-}
-
-impl From<Transaction> for EthTx {
-    fn from(tx: Transaction) -> Self {
-        EthTx {
-            nonce: tx.nonce,
-            gas_price: tx.gas_price,
-            gas: tx.gas,
-            to: H160::from_slice(&tx.to.expect("converting 'to' into bytes")).to_string(),
-            value: tx.value,
-            data: tx.data,
-            chain_id: tx.chain_id,
-        }
-    }
+    /// List of addresses and storage keys the transaction plans to access
+    pub access_list: AccessList,
 }

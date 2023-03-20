@@ -49,9 +49,9 @@ scrt_sss = { path = "../packages/sss" }
 #rand = { version = "0.8.5", default-features = false }
 sha2 = "0.10.6"
 bincode2 = "2.0.1"
-tx-from-scratch = { version = "0.1.0", default-features = false }
-ethereum-types = { version = "0.14.1", default-features = false }
-rlp = { version = "0.5.2", default-features = false }
+ethereum-types = "0.14.1"
+rlp = "0.5.2"
+ethereum-tx-sign = "6.1.0"
 
 #
 #ursa_sharing = { version = "0.1.0", git = "https://github.com/hyperledger/ursa"}

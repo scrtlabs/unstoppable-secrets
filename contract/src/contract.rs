@@ -3,6 +3,7 @@ use cosmwasm_std::{
     entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
 };
 
+use ethereum_tx_sign::{EcdsaSig, FeeMarketTransaction, Transaction};
 use scrt_sss::{ECPoint, ECScalar, Secp256k1Point, Secp256k1Scalar, Share};
 
 use crate::msg::{
@@ -13,8 +14,6 @@ use crate::state::{load_state, save_state, State};
 use ethereum_types::H160;
 use rlp::{Encodable, RlpStream};
 use std::str::FromStr;
-
-use tx_from_scratch::Transaction;
 
 #[entry_point]
 pub fn instantiate(
@@ -301,18 +300,16 @@ fn execute_sign(
     // println!("Running sign..");
     // TODO: not deterministic message..
 
-    let tx = Transaction {
-        nonce: tx.nonce,
-        gas_price: tx.gas_price,
-        gas: tx.gas,
-        to: Some(
-            H160::from_str(&tx.to)
-                .expect("converting 'to' into bytes")
-                .to_fixed_bytes(),
-        ),
-        value: tx.value,
+    let tx = FeeMarketTransaction {
+        chain: tx.chain,
+        nonce: tx.nonce.u128(),
+        max_priority_fee_per_gas: tx.max_priority_fee_per_gas.u128(),
+        max_fee_per_gas: tx.max_fee_per_gas.u128(),
+        gas: tx.gas.u128(),
+        to: Some(H160::from_slice(&tx.to.0).to_fixed_bytes()),
+        value: tx.value.u128(),
         data: tx.data,
-        chain_id: tx.chain_id,
+        access_list: tx.access_list,
     };
 
     let message_arr = tx.hash();
@@ -359,6 +356,12 @@ fn execute_sign(
     )
     .expect("converting curve order from hex string to Secp256k1Scalar");
 
+    println!(
+        "state.public_instance_key: {}",
+        state.public_instance_key.clone().to_string()
+    );
+    println!("state.public_key: {}", state.public_key.clone().to_string());
+
     // Calculate v
     // Source: https://ethereum.stackexchange.com/a/118342/12112
     let R = state.public_instance_key.clone();
@@ -376,20 +379,22 @@ fn execute_sign(
         (false, true) => 3,
     };
 
-    let v = recovery_id as u64 + (tx.chain_id * 2 + 35);
+    let v = recovery_id as u64 + (tx.chain * 2 + 35);
 
-    let mut signed_tx = RlpStream::new();
-    tx.rlp_append(&mut signed_tx);
-    signed_tx.append(&v);
-    signed_tx.append(&r.to_raw().to_vec());
-    signed_tx.append(&s.to_raw().to_vec());
-    signed_tx.finalize_unbounded_list();
+    let signed_tx = tx.sign(&EcdsaSig {
+        v,
+        r: r.to_raw().to_vec(),
+        s: s.to_raw().to_vec(),
+    });
+
+    println!("r: {}", hex::encode(r.to_raw()));
+    println!("s: {}", hex::encode(s.to_raw()));
 
     // TODO: we need to be able to store multiple signatures on-chain so other parties can read them. This is temporary
     state.sig = s.clone();
     save_state(deps.storage, state)?;
 
-    Ok(Response::default().set_data(Binary::from(signed_tx.out().to_vec())))
+    Ok(Response::default().set_data(Binary::from(signed_tx)))
 }
 
 fn read_keygen(deps: Deps, _env: Env, user_index: u32) -> StdResult<ReadKeyGenResponse> {
@@ -488,8 +493,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 mod tests {
     use super::*;
 
+    use base32::encode;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary};
+    use cosmwasm_std::{coins, from_binary, Uint128};
     // use rand::{RngCore, CryptoRng};
 
     fn instantiate_contract(deps: DepsMut, users: u8, threshold: u8) -> MessageInfo {
@@ -637,6 +643,13 @@ mod tests {
             user_secret_key_shares: sk_user_shares,
         };
 
+        println!(
+            "privkey: {}",
+            hex::encode(Secp256k1Scalar::from_num(7).to_raw())
+        );
+        println!("sk_user: {}", hex::encode(sk_user.to_raw()));
+        println!("pk_user: {}", pk_user.to_string());
+
         let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         // Get all values..
@@ -677,18 +690,25 @@ mod tests {
 
         //// Sign
 
-        let tx = Transaction {
+        let tx = FeeMarketTransaction {
             nonce: 1,
-            gas_price: 0_000_000_014_000_000_000, // 14 Gwei (0.000000014000000000 ETH)
+            max_priority_fee_per_gas: 0_000_000_003_000_000_000, // Tip 3 Gwei (0.000000003000000000 ETH)
+            max_fee_per_gas: 0_000_000_015_000_000_000, // 15 Gwei (0.000000015000000000 ETH),
             gas: 21000,
             to: Some(
                 H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
                     .expect("converting 'to' into bytes")
                     .to_fixed_bytes(),
             ),
+            access_list: AccessList::default(), /* (vec![Access {
+                                                    address: H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
+                                                        .expect("converting 'to' into bytes")
+                                                        .to_fixed_bytes(),
+                                                    storage_keys: vec![],
+                                                }]) */
             value: 1, // (0.000000000000000001 ETH)
             data: vec![],
-            chain_id: 1, // Mainnet
+            chain: 1, // Mainnet
         };
         let message_arr = tx.hash();
 
@@ -727,13 +747,26 @@ mod tests {
                 user_sig_num_share: sig_num_share,
                 user_sig_denom_share: sig_denom_share,
                 tx: EthTx {
-                    nonce: 1,
-                    gas_price: 0_000_000_014_000_000_000, // 14 Gwei (0.000000014000000000 ETH)
-                    gas: 21000,
-                    to: "0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb".to_string(),
-                    value: 1, // (0.000000000000000001 ETH)
+                    nonce: Uint128::new(1),
+                    max_priority_fee_per_gas: Uint128::new(0_000_000_003_000_000_000), // Tip 3 Gwei (0.000000003000000000 ETH)
+                    max_fee_per_gas: Uint128::new(0_000_000_015_000_000_000), // 15 Gwei (0.000000015000000000 ETH),
+                    gas: Uint128::new(21000),
+                    to: Binary::from(
+                        H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
+                            .expect("converting 'to' into bytes")
+                            .to_fixed_bytes(),
+                    ),
+                    access_list: AccessList::default(), /* {
+                                                            0: vec![Access {
+                                                                address: H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
+                                                                    .expect("converting 'to' into bytes")
+                                                                    .to_fixed_bytes(),
+                                                                storage_keys: vec![],
+                                                            }],
+                                                        } */
+                    value: Uint128::new(1), // (0.000000000000000001 ETH)
                     data: vec![],
-                    chain_id: 1, // Mainnet
+                    chain: 1, // Mainnet
                 },
             };
 
@@ -745,145 +778,7 @@ mod tests {
         }
     }
 
-    #[test]
-    // #[cfg(feature = "rand-std")]
-    fn execute_test_old() {
-        let mut deps = mock_dependencies();
-
-        let num_of_shares = 7u8;
-        let threshold = 2u8;
-        let total_shares = num_of_shares + threshold;
-
-        // TODO: KeyGen - for now good enough to just ignore..
-        let (sk_shares, sk, pk) = client_create_share(total_shares, threshold);
-        let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
-
-        // Generate 4 values and their shares: k_user, a_user, 0, 0
-        let (k_user_shares, k_user, k_user_public) = client_create_share(total_shares, threshold);
-        let (a_user_shares, a_user) = client_create_share_no_public(total_shares, threshold);
-        let user_zero_shares1 = client_create_share_no_secret(total_shares, threshold * 2);
-        let user_zero_shares2 = client_create_share_no_secret(total_shares, threshold * 2);
-
-        let msg = ExecuteMsg::CreatePresig {
-            user_index: 0,
-            k_user_shares: k_user_shares,
-            a_user_shares: a_user_shares,
-            user_zero_shares1: user_zero_shares1,
-            user_zero_shares2: user_zero_shares2,
-            public_instance_key: k_user_public.to_string(),
-        };
-
-        let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
-
-        // Get all values..
-        let mut k_shares = vec![];
-        let mut a_shares = vec![];
-        let mut zero_shares1 = vec![];
-        let mut zero_shares2 = vec![];
-        let mut sig_num = vec![];
-        let mut sig_denom = vec![];
-        let mut pk_from_chain = Secp256k1Point::default();
-
-        let message_arr = [6u8; 32];
-        let m = Secp256k1Scalar::from_slice(&message_arr).unwrap();
-        // for i in 0..=2*threshold {
-        for i in 0..=num_of_shares {
-            // read shares for each party
-
-            let msg = QueryMsg::ReadPresig {
-                user_index: i as u32,
-            };
-            let resp = query(deps.as_ref(), mock_env(), msg).unwrap();
-
-            let decoded_response: ReadPresigResponse = from_binary(&resp).unwrap();
-
-            let k_share = decoded_response.k_user_share + decoded_response.k_chain_share;
-            let a_share = decoded_response.a_user_share + decoded_response.a_chain_share;
-            let zero_share1 =
-                decoded_response.user_zero_share1 + decoded_response.chain_zero_share1;
-            let zero_share2 =
-                decoded_response.user_zero_share2 + decoded_response.chain_zero_share2;
-
-            pk_from_chain =
-                Secp256k1Point::from_str(&decoded_response.public_instance_key).unwrap();
-            let r = pk_from_chain.x();
-
-            let k_copy = k_share.clone();
-            let a_copy = a_share.clone();
-            let a_copy2 = a_share.clone();
-            let zero1_copy = zero_share1.clone();
-            let zero2_copy = zero_share2.clone();
-
-            k_shares.push(k_share);
-            a_shares.push(a_share);
-            zero_shares1.push(zero_share1);
-            zero_shares2.push(zero_share2);
-
-            let sk_share = sk_shares.get(i as usize).unwrap().clone();
-
-            let sig_num_share = a_copy * (m.clone() + (r * sk_share.data)) - zero1_copy;
-            let sig_denom_share = k_copy * a_copy2.data - zero2_copy;
-            println!(
-                "Shares ids are: {:?}, {:?}, {:?}",
-                sk_share.id, sig_num_share.id, sig_denom_share.id
-            );
-            sig_num.push(sig_num_share);
-            sig_denom.push(sig_denom_share);
-        }
-        let k = scrt_sss::open(k_shares).unwrap();
-        let a = scrt_sss::open(a_shares).unwrap();
-        let r = pk_from_chain.x();
-
-        // Test all values reconstruct to values that make sense
-        let recovered = k.clone();
-
-        let msg = QueryMsg::TestReadInstanceSecret {};
-        let chain_secret: Secp256k1Scalar =
-            from_binary(&query(deps.as_ref(), mock_env(), msg).unwrap()).unwrap();
-
-        assert_eq!(recovered, (chain_secret + k_user));
-        let computed_pk = Secp256k1Point::generate(&recovered);
-        assert_eq!(pk_from_chain, computed_pk);
-
-        let recovered = scrt_sss::open(zero_shares1).unwrap();
-        assert_eq!(recovered, Secp256k1Scalar::zero());
-        let recovered = scrt_sss::open(zero_shares2).unwrap();
-        assert_eq!(recovered, Secp256k1Scalar::zero());
-
-        let recovered = scrt_sss::open(sig_num.clone()).unwrap();
-        let ref_val = (m.clone() + r.clone() * sk.clone()) * a.clone();
-        assert_eq!(recovered, ref_val);
-
-        let recovered = scrt_sss::open(sig_denom.clone()).unwrap();
-        let ref_val = a.clone() * k.clone();
-        assert_eq!(recovered, ref_val);
-
-        // Test a local (non MPC) sig
-        let message = Message::parse(&message_arr);
-        let s = (m + r.clone() * sk) * k.inv();
-        println!("The value of s is {:?}", s.to_hex());
-
-        let sig = Signature {
-            r: r.value,
-            s: s.value,
-        };
-        let pk_lib = PublicKey::parse_slice(&pk.to_slice(), Some(PublicKeyFormat::Raw)).unwrap();
-        assert!(verify(&message, &sig, &pk_lib));
-        println!("Non MPC sig verify passed successfully!");
-
-        let s1 = scrt_sss::open(sig_num).unwrap();
-        let s2 = scrt_sss::open(sig_denom).unwrap();
-        let s = s1 * s2.inv();
-        println!("The value of s is {:?}", s.to_hex());
-
-        let sig = Signature {
-            r: r.value,
-            s: s.value,
-        };
-        assert!(verify(&message, &sig, &pk_lib));
-        println!("MPC sig verified successfully!");
-    }
-
+    use ethereum_tx_sign::{Access, AccessList, FeeMarketTransaction, Transaction};
     use secp256k1::hashes::sha256;
     use secp256k1::rand::rngs::OsRng;
     use secp256k1::{Message as SecpMessage, Secp256k1};
