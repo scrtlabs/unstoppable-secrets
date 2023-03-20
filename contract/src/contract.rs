@@ -3,7 +3,7 @@ use cosmwasm_std::{
     entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
 };
 
-use ethereum_tx_sign::{EcdsaSig, FeeMarketTransaction, Transaction};
+use ethereum_tx_sign::{EcdsaSig, LegacyTransaction, Transaction};
 use scrt_sss::{ECPoint, ECScalar, Secp256k1Point, Secp256k1Scalar, Share};
 
 use crate::msg::{
@@ -12,7 +12,6 @@ use crate::msg::{
 use crate::rng::Prng;
 use crate::state::{load_state, save_state, State};
 use ethereum_types::H160;
-use rlp::{Encodable, RlpStream};
 use std::str::FromStr;
 
 #[entry_point]
@@ -300,16 +299,14 @@ fn execute_sign(
     // println!("Running sign..");
     // TODO: not deterministic message..
 
-    let tx = FeeMarketTransaction {
+    let tx = LegacyTransaction {
         chain: tx.chain,
         nonce: tx.nonce.u128(),
-        max_priority_fee_per_gas: tx.max_priority_fee_per_gas.u128(),
-        max_fee_per_gas: tx.max_fee_per_gas.u128(),
+        gas_price: tx.gas_price.u128(),
         gas: tx.gas.u128(),
         to: Some(H160::from_slice(&tx.to.0).to_fixed_bytes()),
         value: tx.value.u128(),
         data: tx.data,
-        access_list: tx.access_list,
     };
 
     let message_arr = tx.hash();
@@ -690,22 +687,15 @@ mod tests {
 
         //// Sign
 
-        let tx = FeeMarketTransaction {
+        let tx = LegacyTransaction {
             nonce: 1,
-            max_priority_fee_per_gas: 0_000_000_003_000_000_000, // Tip 3 Gwei (0.000000003000000000 ETH)
-            max_fee_per_gas: 0_000_000_015_000_000_000, // 15 Gwei (0.000000015000000000 ETH),
+            gas_price: 0_000_000_014_000_000_000, // 14 Gwei (0.000000014000000000 ETH),
             gas: 21000,
             to: Some(
                 H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
                     .expect("converting 'to' into bytes")
                     .to_fixed_bytes(),
             ),
-            access_list: AccessList::default(), /* (vec![Access {
-                                                    address: H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
-                                                        .expect("converting 'to' into bytes")
-                                                        .to_fixed_bytes(),
-                                                    storage_keys: vec![],
-                                                }]) */
             value: 1, // (0.000000000000000001 ETH)
             data: vec![],
             chain: 1, // Mainnet
@@ -748,22 +738,13 @@ mod tests {
                 user_sig_denom_share: sig_denom_share,
                 tx: EthTx {
                     nonce: Uint128::new(1),
-                    max_priority_fee_per_gas: Uint128::new(0_000_000_003_000_000_000), // Tip 3 Gwei (0.000000003000000000 ETH)
-                    max_fee_per_gas: Uint128::new(0_000_000_015_000_000_000), // 15 Gwei (0.000000015000000000 ETH),
+                    gas_price: Uint128::new(0_000_000_014_000_000_000), // 14 Gwei (0.000000014000000000 ETH),
                     gas: Uint128::new(21000),
                     to: Binary::from(
                         H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
                             .expect("converting 'to' into bytes")
                             .to_fixed_bytes(),
                     ),
-                    access_list: AccessList::default(), /* {
-                                                            0: vec![Access {
-                                                                address: H160::from_str("0xd41c057fd1c78805AAC12B0A94a405c0461A6FBb")
-                                                                    .expect("converting 'to' into bytes")
-                                                                    .to_fixed_bytes(),
-                                                                storage_keys: vec![],
-                                                            }],
-                                                        } */
                     value: Uint128::new(1), // (0.000000000000000001 ETH)
                     data: vec![],
                     chain: 1, // Mainnet
@@ -778,7 +759,7 @@ mod tests {
         }
     }
 
-    use ethereum_tx_sign::{Access, AccessList, FeeMarketTransaction, Transaction};
+    use ethereum_tx_sign::Transaction;
     use secp256k1::hashes::sha256;
     use secp256k1::rand::rngs::OsRng;
     use secp256k1::{Message as SecpMessage, Secp256k1};

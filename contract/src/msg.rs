@@ -102,8 +102,7 @@ pub struct EthTx {
     /// Nonce
     pub nonce: Uint128,
     /// Gas price
-    pub max_priority_fee_per_gas: Uint128,
-    pub max_fee_per_gas: Uint128,
+    pub gas_price: Uint128,
     /// Gas limit
     pub gas: Uint128,
     /// Recipient (None when contract creation)
@@ -112,6 +111,4 @@ pub struct EthTx {
     pub value: Uint128,
     /// Input data
     pub data: Vec<u8>,
-    /// List of addresses and storage keys the transaction plans to access
-    pub access_list: AccessList,
 }
