@@ -32,7 +32,7 @@ bincode2 = "2.0.1"
 # Assaf: The paillier crates also requires libgmp3
 # sudo apt install libgmp3-dev
 paillier = { version = "0.2.0", default-features = false, features = [
-  "usegmp",
+  "useramp",
   "keygen"
 ] }
 

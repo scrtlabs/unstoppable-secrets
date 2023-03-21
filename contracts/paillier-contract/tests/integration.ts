@@ -40,7 +40,7 @@ type Account = {
 
 const accounts: Account[] = [];
 
-let contract: string;
+let code_id: string;
 
 beforeAll(async () => {
   jest.spyOn(console, "warn").mockImplementation(() => {});
@@ -94,15 +94,18 @@ beforeAll(async () => {
   }
   expect(tx.code).toBe(0);
 
-  const { code_id } = MsgStoreCodeResponse.decode(tx.data[0]);
+  ({ code_id } = MsgStoreCodeResponse.decode(tx.data[0]));
+}, 90_000);
 
-  tx = await secretjs.tx.compute.instantiateContract(
+test("gm", async () => {
+  const { secretjs } = accounts[0];
+
+  let tx = await secretjs.tx.compute.instantiateContract(
     {
       sender: secretjs.address,
       code_id,
       init_msg: {
-        number_of_users: 7,
-        signing_threshold: 2,
+        encryption_key: "qwe",
       },
       label: String(Date.now()),
     },
@@ -114,17 +117,18 @@ beforeAll(async () => {
   }
   expect(tx.code).toBe(0);
 
-  contract = MsgInstantiateContractResponse.decode(tx.data[0]).address;
-}, 90_000);
+  const contract_address = MsgInstantiateContractResponse.decode(
+    tx.data[0]
+  ).address;
 
-test("gm", async () => {
-  const { secretjs } = accounts[0];
-
-  const tx = await secretjs.tx.compute.executeContract(
+  tx = await secretjs.tx.compute.executeContract(
     {
       sender: secretjs.address,
-      contract_address: contract,
-      msg: {},
+      contract_address,
+      msg: {
+        encrypted_c1: "asd",
+        encrypted_c2: "zxc",
+      },
     },
     { gasLimit: 1_000_000 }
   );
