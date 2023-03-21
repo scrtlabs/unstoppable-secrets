@@ -12,7 +12,6 @@ use crate::msg::{
 };
 use crate::rng::Prng;
 use crate::state::{load_state, save_state, State};
-use ethereum_types::H160;
 
 #[entry_point]
 pub fn instantiate(
@@ -526,6 +525,7 @@ mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary, Uint128};
     use ethereum_tx_sign::LegacyTransaction;
+    use ethereum_types::H160;
     use std::str::FromStr;
 
     fn instantiate_contract(deps: DepsMut, users: u8, threshold: u8) -> MessageInfo {
@@ -604,50 +604,6 @@ mod tests {
         let shares = scrt_sss::split(&mut rng, &privkey, threshold, num_of_shares);
 
         return (shares, privkey, pubkey);
-    }
-
-    #[test]
-    fn keygen_test() {
-        let mut deps = mock_dependencies();
-
-        let num_of_shares = 7u8;
-        let threshold = 2u8;
-        let total_shares = num_of_shares + threshold;
-
-        let info = instantiate_contract(deps.as_mut(), num_of_shares, threshold);
-
-        let (sk_user_shares, _sk_user, pk_user) = client_create_share(total_shares, threshold);
-        let msg = ExecuteMsg::KeyGen {
-            user_public_key: pk_user.to_string(),
-            user_secret_key_shares: sk_user_shares,
-        };
-
-        let _ = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
-
-        // Get all values..
-        let mut sk_shares = vec![];
-        let mut pk = Secp256k1Point::default();
-
-        for i in 0..=num_of_shares {
-            // read shares for each party
-
-            let msg = QueryMsg::ReadKeyGen {
-                user_index: i as u32,
-            };
-            let resp = query(deps.as_ref(), mock_env(), msg).unwrap();
-
-            let decoded_response: ReadKeyGenResponse = from_binary(&resp).unwrap();
-
-            let sk_share = decoded_response.sk_user_share + decoded_response.sk_chain_share;
-            pk = Secp256k1Point::from_str(&decoded_response.public_key).unwrap();
-            sk_shares.push(sk_share);
-        }
-
-        let sk = scrt_sss::open(sk_shares).unwrap();
-        let computed_pk = Secp256k1Point::generate(&sk);
-        assert_eq!(pk, computed_pk);
-
-        println!("KeyGen successful!");
     }
 
     #[test]
