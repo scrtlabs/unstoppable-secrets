@@ -388,9 +388,9 @@ fn execute_sign(
 
     println!("********************************");
     if is_verified {
-        println!("good signature");
+        println!("\x1b[32mgood signature\x1b[0m");
     } else {
-        println!("bad signature");
+        println!("\x1b[31mBAD SIGNATURE\x1b[0m");
     }
     println!("********************************");
 
@@ -400,7 +400,34 @@ fn execute_sign(
         .secp256k1_recover_pubkey(&message_to_sign, sig_for_verify, recovery_id)
         .unwrap();
 
-    println!("recovered_pubkey: 0x{}", hex::encode(recovered_pubkey));
+    println!(
+        "recovered_pubkey: 0x{}",
+        hex::encode(recovered_pubkey.clone())
+    );
+    {
+        for i in 0..=3 {
+            let recovered_pubkey = deps
+                .api
+                .secp256k1_recover_pubkey(&message_to_sign, sig_for_verify, i)
+                .unwrap();
+
+            println!(
+                "recovered_pubkey ({}): 0x{}",
+                i,
+                hex::encode(recovered_pubkey.clone())
+            );
+        }
+    }
+    let is_pubkey_recovery =
+    state.public_key.clone().to_string() == hex::encode(recovered_pubkey)[2..] && state.public_key.clone().to_string() == "4e87a2f102097fc6b53821db6e2cd3b774d9486ecae5e613f2643e24698fd6578e7c49c6bb0b81950413d61d75a6cad12f5de0d66b6980f3c8e83b6b74095c0f";
+
+    println!("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+    if is_pubkey_recovery {
+        println!("\x1b[32mgood pubkey recovery\x1b[0m");
+    } else {
+        println!("\x1b[31mBAD PUBKEY RECOVERY\x1b[0m");
+    }
+    println!("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
 
     // TODO: we need to be able to store multiple signatures on-chain so other parties can read them. This is temporary
     state.sig = s.clone();
@@ -758,7 +785,10 @@ mod tests {
 
             if res.data.is_some() {
                 println!("================================================");
-                println!("signed eth tx: 0x{}", hex::encode(res.data.unwrap().0));
+                println!(
+                    "signed eth tx: \x1b[33m0x{}\x1b[0m",
+                    hex::encode(res.data.unwrap().0)
+                );
                 println!("================================================");
             }
         }
