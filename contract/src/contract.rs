@@ -340,7 +340,11 @@ fn execute_sign(
 
     let s1 = scrt_sss::open(state.sig_num_shares.clone()).unwrap();
     let s2 = scrt_sss::open(state.sig_denom_shares.clone()).unwrap();
-    let s = s1 * s2.inv();
+    let mut s = s1 * s2.inv();
+
+    if s.to_big_int() < Secp256k1Scalar::zero().to_big_int() {
+        s = s.inv()
+    }
 
     println!(
         "state.public_instance_key aka nonce: 0x{}",
