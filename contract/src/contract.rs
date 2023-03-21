@@ -13,7 +13,6 @@ use crate::msg::{
 use crate::rng::Prng;
 use crate::state::{load_state, save_state, State};
 use ethereum_types::H160;
-use std::str::FromStr;
 
 #[entry_point]
 pub fn instantiate(
@@ -263,6 +262,8 @@ fn create_presig(
     Ok(Response::default())
 }
 
+const MAX_ALLOWANCE: u128 = 1_000_000_000_000_000_000;
+
 fn execute_sign(
     deps: DepsMut,
     _env: Env,
@@ -272,6 +273,12 @@ fn execute_sign(
     user_sig_denom_share: Share<Secp256k1Scalar>,
     tx: EthTx,
 ) -> Result<Response, CustomContractError> {
+    if tx.value.u128() > MAX_ALLOWANCE {
+        return Err(CustomContractError::Std(StdError::generic_err(
+            "cannot send more than max allowance of 1 ETH",
+        )));
+    }
+
     let mut state = load_state(deps.storage)?;
     let _total_shares = state.num_of_users + state.threshold;
 
@@ -298,18 +305,9 @@ fn execute_sign(
     // println!("Running sign..");
     // TODO: not deterministic message..
 
-    let tx = LegacyTransaction {
-        chain: tx.chain,
-        nonce: tx.nonce.u128(),
-        gas_price: tx.gas_price.u128(),
-        gas: tx.gas.u128(),
-        to: Some(H160::from_slice(&tx.to.0).to_fixed_bytes()),
-        value: tx.value.u128(),
-        data: tx.data,
-    };
-
-    let message_arr = tx.hash();
-    let m = Secp256k1Scalar::from_slice(&message_arr).unwrap();
+    let tx: LegacyTransaction = tx.into();
+    let message_to_sign = tx.hash();
+    let m = Secp256k1Scalar::from_slice(&message_to_sign).unwrap();
 
     let r = state.public_instance_key.x();
     // Produce the t 'chain' shares
@@ -385,7 +383,7 @@ fn execute_sign(
 
     let is_verified = deps
         .api
-        .secp256k1_verify(&message_arr, sig_for_verify, pk_for_verify)
+        .secp256k1_verify(&message_to_sign, sig_for_verify, pk_for_verify)
         .unwrap();
 
     println!("********************************");
@@ -399,7 +397,7 @@ fn execute_sign(
     println!("recovery_id: {}", recovery_id);
     let recovered_pubkey = deps
         .api
-        .secp256k1_recover_pubkey(&message_arr, sig_for_verify, recovery_id)
+        .secp256k1_recover_pubkey(&message_to_sign, sig_for_verify, recovery_id)
         .unwrap();
 
     println!("recovered_pubkey: 0x{}", hex::encode(recovered_pubkey));
@@ -509,7 +507,8 @@ mod tests {
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary, Uint128};
-    // use rand::{RngCore, CryptoRng};
+    use ethereum_tx_sign::LegacyTransaction;
+    use std::str::FromStr;
 
     fn instantiate_contract(deps: DepsMut, users: u8, threshold: u8) -> MessageInfo {
         let msg = InstantiateMsg {
@@ -703,22 +702,22 @@ mod tests {
 
         //// Sign
 
-        let tx = LegacyTransaction {
-            nonce: 2,
-            gas_price: 40_000_000_000, // 40 Gwei
-            gas: 21_000,
-            to: Some(
+        let tx = EthTx {
+            nonce: Uint128::new(2),
+            gas_price: Uint128::new(40_000_000_000), // 40 Gwei
+            gas: Uint128::new(21_000),
+            to: Binary::from(
                 H160::from_str("0x4D8846d36D5349F14eC887a7701E48475453932A")
                     .expect("converting 'to' into bytes")
                     .to_fixed_bytes(),
             ),
-            value: 0_000_000_000_000_000_001,
+            value: Uint128::new(0_000_000_000_000_000_001),
             data: vec![],
             chain: 1, // Mainnet
         };
-        let message_arr = tx.hash();
 
-        let m = Secp256k1Scalar::from_slice(&message_arr).unwrap();
+        let message_to_sign = Into::<LegacyTransaction>::into(tx.clone()).hash();
+        let m = Secp256k1Scalar::from_slice(&message_to_sign).unwrap();
 
         for i in 0..=num_of_shares - 1 {
             // read shares for each party
@@ -752,19 +751,7 @@ mod tests {
                 user_index: i as u32,
                 user_sig_num_share: sig_num_share,
                 user_sig_denom_share: sig_denom_share,
-                tx: EthTx {
-                    nonce: Uint128::new(2),
-                    gas_price: Uint128::new(40_000_000_000), // 40 Gwei
-                    gas: Uint128::new(21_000),
-                    to: Binary::from(
-                        H160::from_str("0x4D8846d36D5349F14eC887a7701E48475453932A")
-                            .expect("converting 'to' into bytes")
-                            .to_fixed_bytes(),
-                    ),
-                    value: Uint128::new(0_000_000_000_000_000_001),
-                    data: vec![],
-                    chain: 1, // Mainnet
-                },
+                tx: tx.clone(),
             };
 
             let res = execute(deps.as_mut(), mock_env(), info.clone(), exec_msg).unwrap();
@@ -776,6 +763,4 @@ mod tests {
             }
         }
     }
-
-    use ethereum_tx_sign::{LegacyTransaction, Transaction};
 }

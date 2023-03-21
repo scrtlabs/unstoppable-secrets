@@ -1,4 +1,6 @@
 use cosmwasm_std::{Binary, Uint128};
+use ethereum_tx_sign::LegacyTransaction;
+use ethereum_types::H160;
 use scrt_sss::{Secp256k1Scalar, Share};
 use serde::{Deserialize, Serialize};
 
@@ -110,4 +112,32 @@ pub struct EthTx {
     pub value: Uint128,
     /// Input data
     pub data: Vec<u8>,
+}
+
+impl Into<EthTx> for LegacyTransaction {
+    fn into(self) -> EthTx {
+        EthTx {
+            chain: self.chain,
+            nonce: Uint128::new(self.nonce),
+            gas_price: Uint128::new(self.gas_price),
+            gas: Uint128::new(self.gas),
+            to: Binary::from(self.to.expect("unwrap 'to'")),
+            value: Uint128::new(self.value),
+            data: self.data,
+        }
+    }
+}
+
+impl Into<LegacyTransaction> for EthTx {
+    fn into(self) -> LegacyTransaction {
+        LegacyTransaction {
+            chain: self.chain,
+            nonce: self.nonce.u128(),
+            gas_price: self.gas_price.u128(),
+            gas: self.gas.u128(),
+            to: Some(H160::from_slice(&self.to.0).to_fixed_bytes()),
+            value: self.value.u128(),
+            data: self.data,
+        }
+    }
 }
