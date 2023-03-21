@@ -677,8 +677,8 @@ mod tests {
         //// Sign
 
         let tx = EthTx {
-            nonce: Uint128::new(2),
-            gas_price: Uint128::new(40_000_000_000), // 40 Gwei
+            nonce: Uint128::new(3),
+            gas_price: Uint128::new(13_000_000_000), // 13 Gwei
             gas: Uint128::new(21_000),
             to: Binary::from(
                 H160::from_str("0x4D8846d36D5349F14eC887a7701E48475453932A")
