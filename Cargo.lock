@@ -1077,6 +1077,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy_static"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
 name = "libc"
 version = "0.2.140"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1233,12 +1239,14 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 [[package]]
 name = "paillier"
 version = "0.2.1-alpha.0"
-source = "git+https://github.com/scrtlabs/rust-paillier?rev=91dc430429d043757645f7688479b696d8c2033f#91dc430429d043757645f7688479b696d8c2033f"
+source = "git+https://github.com/scrtlabs/rust-paillier?rev=09a6e17c3094d550dba01ccbaa5b6d629166b9cd#09a6e17c3094d550dba01ccbaa5b6d629166b9cd"
 dependencies = [
  "bit-vec",
+ "lazy_static",
  "num-traits 0.1.43",
  "ramp",
  "rand",
+ "rand_chacha",
  "rayon",
  "serde",
  "serde_derive",
@@ -1371,7 +1379,7 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 [[package]]
 name = "ramp"
 version = "0.7.0"
-source = "git+https://github.com/scrtlabs/ramp?rev=9555445f0232fd558a0c5893cfa256e54a1fc896#9555445f0232fd558a0c5893cfa256e54a1fc896"
+source = "git+https://github.com/scrtlabs/ramp?rev=19ff0dc2b0ec0f3fea2590a83bf5a0468e206a0a#19ff0dc2b0ec0f3fea2590a83bf5a0468e206a0a"
 dependencies = [
  "cc",
  "hamming",
