@@ -5,9 +5,6 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::ENCRYPTION_KEY;
 use paillier::*;
 
-/// Assaf: The paillier crates requires libgmp3
-/// sudo apt install libgmp3-dev
-
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,

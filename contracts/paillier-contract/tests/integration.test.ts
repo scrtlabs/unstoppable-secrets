@@ -1,4 +1,3 @@
-import { ec } from "elliptic";
 import * as fs from "fs";
 import {
   MsgInstantiateContractResponse,
@@ -72,7 +71,7 @@ beforeAll(async () => {
   await waitForBlocks("secretdev-1");
 
   const wasmBytes = fs.readFileSync(
-    `${__dirname}/../contract.wasm.gz`
+    `${__dirname}/../contract.wasm`
   ) as Uint8Array;
 
   console.log("Storing contract on-chain...");
