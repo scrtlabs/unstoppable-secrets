@@ -1239,7 +1239,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 [[package]]
 name = "paillier"
 version = "0.2.1-alpha.0"
-source = "git+https://github.com/scrtlabs/rust-paillier?rev=09a6e17c3094d550dba01ccbaa5b6d629166b9cd#09a6e17c3094d550dba01ccbaa5b6d629166b9cd"
+source = "git+https://github.com/scrtlabs/rust-paillier?rev=a56c9a81b113444d30baaf43dec060f66f0c3b79#a56c9a81b113444d30baaf43dec060f66f0c3b79"
 dependencies = [
  "bit-vec",
  "lazy_static",
@@ -1379,7 +1379,7 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 [[package]]
 name = "ramp"
 version = "0.7.0"
-source = "git+https://github.com/scrtlabs/ramp?rev=19ff0dc2b0ec0f3fea2590a83bf5a0468e206a0a#19ff0dc2b0ec0f3fea2590a83bf5a0468e206a0a"
+source = "git+https://github.com/scrtlabs/ramp?rev=396c8a3f6d6584fc40e2f768dd00c69c944a6aed#396c8a3f6d6584fc40e2f768dd00c69c944a6aed"
 dependencies = [
  "cc",
  "hamming",

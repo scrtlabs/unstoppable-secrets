@@ -1,7 +1,7 @@
 .PHONY: build run-localsecret _test kill-localsecret 
 
 build:
-	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
+	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown --locked
 	cp ../../target/wasm32-unknown-unknown/release/unstoppable_secrets_paillier.wasm contract.wasm
 
 run-localsecret:
@@ -15,3 +15,6 @@ _test:
 	yarn test
 
 test: build run-localsecret _test kill-localsecret 
+
+find-floating-points: build
+	wasm2wat contract.wasm | grep -c -P 'f(64|32)'
