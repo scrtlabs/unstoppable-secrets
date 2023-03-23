@@ -29,7 +29,7 @@ cw-storage-plus = { version = "0.14.0", default-features = false }
 cosmwasm-schema = { version = "1.1.0", optional = true }
 thiserror = "1.0"
 bincode2 = "2.0.1"
-paillier = { git = "https://github.com/scrtlabs/rust-paillier", rev = "545fad095909b65d70fe2d797f5601742d70bcca" }
+paillier = { git = "https://github.com/scrtlabs/rust-paillier", rev = "e4d6d296bc88208f20f381e1b7a868b3110a5ab2" }
 # paillier = { path = "../../../rust-paillier" }
 getrandom = { version = "0.2.8", features = ["js"] }
 

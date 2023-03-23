@@ -974,12 +974,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ieee754"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9007da9cacbd3e6343da136e98b0d2df013f553d35bdec8b518f07bea768e19c"
-
-[[package]]
 name = "impl-codec"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1257,7 +1251,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 [[package]]
 name = "paillier"
 version = "0.2.1-alpha.0"
-source = "git+https://github.com/scrtlabs/rust-paillier?rev=545fad095909b65d70fe2d797f5601742d70bcca#545fad095909b65d70fe2d797f5601742d70bcca"
+source = "git+https://github.com/scrtlabs/rust-paillier?rev=e4d6d296bc88208f20f381e1b7a868b3110a5ab2#e4d6d296bc88208f20f381e1b7a868b3110a5ab2"
 dependencies = [
  "bit-vec",
  "lazy_static",
@@ -1397,11 +1391,10 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 [[package]]
 name = "ramp"
 version = "0.7.0"
-source = "git+https://github.com/scrtlabs/ramp?rev=471ec6645cc0eadf88e1d8b39f8538ef3df8d88f#471ec6645cc0eadf88e1d8b39f8538ef3df8d88f"
+source = "git+https://github.com/scrtlabs/ramp?rev=fc56d683e36fc27a71c2caf5219600f97e83e983#fc56d683e36fc27a71c2caf5219600f97e83e983"
 dependencies = [
  "cc",
  "hamming",
- "ieee754",
  "num-bigint",
  "num-integer 0.1.45 (git+https://github.com/scrtlabs/num-integer?rev=066967126c9450bfe378433c09913f1d94e042ab)",
  "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=1c3d9893d2f9dcdf872626d4e723dc88bdc03575)",
@@ -1525,9 +1518,9 @@ dependencies = [
 
 [[package]]
 name = "rustc-demangle"
-version = "0.1.21"
+version = "0.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ef03e0a2b150c7a90d01faf6254c9c48a41e95fb2a8c2ac1c6f0d2b9aefc342"
+checksum = "d4a36c42d1873f9a77c53bde094f9664d9891bc604a45b4798fd2c389ed12e5b"
 
 [[package]]
 name = "rustc-hex"
