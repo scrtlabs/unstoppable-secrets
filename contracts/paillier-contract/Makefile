@@ -1,7 +1,7 @@
 .PHONY: build run-localsecret _test kill-localsecret 
 
 build:
-	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown --locked
+	RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
 	cp ../../target/wasm32-unknown-unknown/release/unstoppable_secrets_paillier.wasm contract.wasm
 
 run-localsecret:
