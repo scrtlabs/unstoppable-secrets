@@ -877,10 +877,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c05aeb6a22b8f62540c194aac980f2115af067bfe15a0734d7277a768d396b31"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "wasi",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -1187,17 +1185,17 @@ dependencies = [
 [[package]]
 name = "num-integer"
 version = "0.1.45"
-source = "git+https://github.com/scrtlabs/num-integer?rev=066967126c9450bfe378433c09913f1d94e042ab#066967126c9450bfe378433c09913f1d94e042ab"
+source = "git+https://github.com/scrtlabs/num-integer?rev=b47fd61e227c3eb1b5c96c89f91046fc041b8530#b47fd61e227c3eb1b5c96c89f91046fc041b8530"
 dependencies = [
- "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=1c3d9893d2f9dcdf872626d4e723dc88bdc03575)",
+ "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=41a7b37b3a9bb62f1586406075da6c6e71d3b163)",
 ]
 
 [[package]]
 name = "num-traits"
 version = "0.1.43"
-source = "git+https://github.com/scrtlabs/num-traits?rev=1cb7c5de33563fc40351df681546cdc963e788dd#1cb7c5de33563fc40351df681546cdc963e788dd"
+source = "git+https://github.com/scrtlabs/num-traits?rev=c1d3f2c53678fb72318bad1598592f2fe830400b#c1d3f2c53678fb72318bad1598592f2fe830400b"
 dependencies = [
- "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=1c3d9893d2f9dcdf872626d4e723dc88bdc03575)",
+ "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=41a7b37b3a9bb62f1586406075da6c6e71d3b163)",
 ]
 
 [[package]]
@@ -1212,7 +1210,7 @@ dependencies = [
 [[package]]
 name = "num-traits"
 version = "0.2.15"
-source = "git+https://github.com/scrtlabs/num-traits?rev=1c3d9893d2f9dcdf872626d4e723dc88bdc03575#1c3d9893d2f9dcdf872626d4e723dc88bdc03575"
+source = "git+https://github.com/scrtlabs/num-traits?rev=41a7b37b3a9bb62f1586406075da6c6e71d3b163#41a7b37b3a9bb62f1586406075da6c6e71d3b163"
 dependencies = [
  "autocfg",
 ]
@@ -1251,7 +1249,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 [[package]]
 name = "paillier"
 version = "0.2.1-alpha.0"
-source = "git+https://github.com/scrtlabs/rust-paillier?rev=e4d6d296bc88208f20f381e1b7a868b3110a5ab2#e4d6d296bc88208f20f381e1b7a868b3110a5ab2"
+source = "git+https://github.com/scrtlabs/rust-paillier?rev=ad52a898f62f763937f33382a6e9a33eee5fc24c#ad52a898f62f763937f33382a6e9a33eee5fc24c"
 dependencies = [
  "bit-vec",
  "lazy_static",
@@ -1391,13 +1389,13 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 [[package]]
 name = "ramp"
 version = "0.7.0"
-source = "git+https://github.com/scrtlabs/ramp?rev=fc56d683e36fc27a71c2caf5219600f97e83e983#fc56d683e36fc27a71c2caf5219600f97e83e983"
+source = "git+https://github.com/scrtlabs/ramp?rev=1d96d5411549a21515d03ff84b2aba6b021dc188#1d96d5411549a21515d03ff84b2aba6b021dc188"
 dependencies = [
  "cc",
  "hamming",
  "num-bigint",
- "num-integer 0.1.45 (git+https://github.com/scrtlabs/num-integer?rev=066967126c9450bfe378433c09913f1d94e042ab)",
- "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=1c3d9893d2f9dcdf872626d4e723dc88bdc03575)",
+ "num-integer 0.1.45 (git+https://github.com/scrtlabs/num-integer?rev=b47fd61e227c3eb1b5c96c89f91046fc041b8530)",
+ "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=41a7b37b3a9bb62f1586406075da6c6e71d3b163)",
  "rand",
  "rustc-cfg",
 ]
@@ -1894,7 +1892,6 @@ dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cw-storage-plus",
- "getrandom",
  "paillier",
  "schemars",
  "serde",
