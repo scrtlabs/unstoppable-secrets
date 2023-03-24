@@ -30,7 +30,7 @@ cosmwasm-schema = { version = "1.1.0", optional = true }
 thiserror = "1.0"
 bincode2 = "2.0.1"
 # paillier = { path = "../../../rust-paillier" }
-paillier = { git = "https://github.com/scrtlabs/rust-paillier", rev = "ad52a898f62f763937f33382a6e9a33eee5fc24c" }
+paillier = { git = "https://github.com/scrtlabs/rust-paillier", branch = "secret-paillier-0.2.x" }
 
 [[bin]]
 name = "schema"

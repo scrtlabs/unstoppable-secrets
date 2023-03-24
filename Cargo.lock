@@ -1185,17 +1185,9 @@ dependencies = [
 [[package]]
 name = "num-integer"
 version = "0.1.45"
-source = "git+https://github.com/scrtlabs/num-integer?rev=b47fd61e227c3eb1b5c96c89f91046fc041b8530#b47fd61e227c3eb1b5c96c89f91046fc041b8530"
+source = "git+https://github.com/scrtlabs/num-integer?branch=secret-num-integer-0.1.x#4898d929ce3253e8a0fd76cfc59b3e5a42e97464"
 dependencies = [
- "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=41a7b37b3a9bb62f1586406075da6c6e71d3b163)",
-]
-
-[[package]]
-name = "num-traits"
-version = "0.1.43"
-source = "git+https://github.com/scrtlabs/num-traits?rev=c1d3f2c53678fb72318bad1598592f2fe830400b#c1d3f2c53678fb72318bad1598592f2fe830400b"
-dependencies = [
- "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=41a7b37b3a9bb62f1586406075da6c6e71d3b163)",
+ "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?branch=secret-num-traits-0.2.x)",
 ]
 
 [[package]]
@@ -1210,7 +1202,7 @@ dependencies = [
 [[package]]
 name = "num-traits"
 version = "0.2.15"
-source = "git+https://github.com/scrtlabs/num-traits?rev=41a7b37b3a9bb62f1586406075da6c6e71d3b163#41a7b37b3a9bb62f1586406075da6c6e71d3b163"
+source = "git+https://github.com/scrtlabs/num-traits?branch=secret-num-traits-0.2.x#41a7b37b3a9bb62f1586406075da6c6e71d3b163"
 dependencies = [
  "autocfg",
 ]
@@ -1249,11 +1241,11 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 [[package]]
 name = "paillier"
 version = "0.2.1-alpha.0"
-source = "git+https://github.com/scrtlabs/rust-paillier?rev=ad52a898f62f763937f33382a6e9a33eee5fc24c#ad52a898f62f763937f33382a6e9a33eee5fc24c"
+source = "git+https://github.com/scrtlabs/rust-paillier?branch=secret-paillier-0.2.x#424eef82f4e50540ac9c1f9954e0e1c680be241a"
 dependencies = [
  "bit-vec",
  "lazy_static",
- "num-traits 0.1.43",
+ "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?branch=secret-num-traits-0.2.x)",
  "ramp",
  "rand",
  "rand_chacha",
@@ -1389,13 +1381,13 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 [[package]]
 name = "ramp"
 version = "0.7.0"
-source = "git+https://github.com/scrtlabs/ramp?rev=1d96d5411549a21515d03ff84b2aba6b021dc188#1d96d5411549a21515d03ff84b2aba6b021dc188"
+source = "git+https://github.com/scrtlabs/ramp?branch=secret-ramp-0.7.x#6d84a89f06ebdc6c0d1b61a0d830e3973b131a55"
 dependencies = [
  "cc",
  "hamming",
  "num-bigint",
- "num-integer 0.1.45 (git+https://github.com/scrtlabs/num-integer?rev=b47fd61e227c3eb1b5c96c89f91046fc041b8530)",
- "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?rev=41a7b37b3a9bb62f1586406075da6c6e71d3b163)",
+ "num-integer 0.1.45 (git+https://github.com/scrtlabs/num-integer?branch=secret-num-integer-0.1.x)",
+ "num-traits 0.2.15 (git+https://github.com/scrtlabs/num-traits?branch=secret-num-traits-0.2.x)",
  "rand",
  "rustc-cfg",
 ]
