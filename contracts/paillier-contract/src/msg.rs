@@ -10,8 +10,8 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct ExecuteMsg {
-    pub encrypted_c1: Binary,
-    pub encrypted_c2: Binary,
+    pub c1: Binary,
+    pub c2: Binary,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]

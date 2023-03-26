@@ -1,10 +1,9 @@
 use crate::errors::ContractError;
-use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
-use serde::{Serialize, Deserialize};
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::ENCRYPTION_KEY;
-// use paillier::*;
-use paillier::{Paillier, EncryptionKey, Add, EncodedCiphertext};
+use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use paillier::{Add, EncodedCiphertext, EncryptionKey, Paillier};
+use serde::{Deserialize, Serialize};
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
@@ -27,24 +26,6 @@ pub struct LolFuckingEncryptionTypes {
     pub _phantom: std::marker::PhantomData<u64>,
 }
 
-impl LolFuckingEncryptionTypes {
-    pub fn to_pallier_fucking_shit(&self) -> EncodedCiphertext<u64> {
-        EncodedCiphertext {
-            raw: self.raw.clone(),
-            components: self.components as usize,
-            _phantom: self._phantom,
-        }
-    }
-
-    pub fn from_pallier_shit(that: &EncodedCiphertext<u64>) -> Self {
-        Self {
-            raw: that.raw.clone(),
-            components: that.components as u64,
-            _phantom: that._phantom,
-        }
-    }
-}
-
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
@@ -56,21 +37,15 @@ pub fn execute(
 
     let ek: EncryptionKey = bincode2::deserialize(encryption_key.as_slice()).unwrap();
 
-    let c1_temp: LolFuckingEncryptionTypes = bincode2::deserialize(msg.encrypted_c1.as_slice()).unwrap();
-    let c2_temp: LolFuckingEncryptionTypes = bincode2::deserialize(msg.encrypted_c1.as_slice()).unwrap();
+    let c1: EncodedCiphertext<u64> = bincode2::deserialize(msg.c1.as_slice()).unwrap();
+    let c2: EncodedCiphertext<u64> = bincode2::deserialize(msg.c2.as_slice()).unwrap();
 
-    let c1 = c1_temp.to_pallier_fucking_shit();
-    let c2 = c2_temp.to_pallier_fucking_shit();
-    // // let c2: EncodedCiphertext<u64> = bincode2::deserialize(msg.encrypted_c2.as_slice()).unwrap();
-    // //
-    // // // add all of them together
+    // add all of them together
     let c = Paillier::add(&ek, &c1, &c2);
 
-    let c_out = LolFuckingEncryptionTypes::from_pallier_shit(&c);
+    let c = bincode2::serialize(&c).unwrap();
 
-    let encrypted_c = bincode2::serialize(&c_out).unwrap();
-
-    Ok(Response::default().set_data(encrypted_c))
+    Ok(Response::default().set_data(c))
 }
 
 #[entry_point]
@@ -83,8 +58,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use paillier::*;
 
     #[test]
     // #[cfg(feature = "rand-std")]
@@ -92,7 +67,7 @@ mod tests {
         // generate a fresh keypair and extract encryption and decryption keys
         let (ek, dk) = Paillier::keypair().keys();
 
-        let encryption_key: Binary = bincode2::serialize(&ek).expect("bincode2 ek").into();
+        let encryption_key: Binary = bincode2::serialize(&ek).unwrap().into();
 
         let mut deps = mock_dependencies();
 
@@ -103,24 +78,21 @@ mod tests {
             mock_info("creator", &[]),
             InstantiateMsg { encryption_key },
         )
-        .expect("instantiate");
+        .unwrap();
 
         // encrypt two values
         let c1 = Paillier::encrypt(&ek, 10);
         let c2 = Paillier::encrypt(&ek, 20);
 
-        let encrypted_a: Binary = bincode2::serialize(&c1).expect("bincode2 c1").into();
-        let encrypted_b: Binary = bincode2::serialize(&c2).expect("bincode2 c2").into();
+        let c1: Binary = bincode2::serialize(&c1).unwrap().into();
+        let c2: Binary = bincode2::serialize(&c2).unwrap().into();
 
         // send the two values to the contract and get their sum
         let encrypted_c = execute(
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &[]),
-            ExecuteMsg {
-                encrypted_c1: encrypted_a,
-                encrypted_c2: encrypted_b,
-            },
+            ExecuteMsg { c1, c2 },
         )
         .unwrap()
         .data
