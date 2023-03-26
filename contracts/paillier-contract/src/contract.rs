@@ -1,10 +1,10 @@
 use crate::errors::ContractError;
 use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
-
+use serde::{Serialize, Deserialize};
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::ENCRYPTION_KEY;
-use paillier::*;
-
+// use paillier::*;
+use paillier::{Paillier, EncryptionKey, Add, EncodedCiphertext};
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
@@ -15,6 +15,34 @@ pub fn instantiate(
     ENCRYPTION_KEY.save(deps.storage, &msg.encryption_key)?;
 
     Ok(Response::default())
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LolFuckingEncryptionTypes {
+    #[serde(with = "crate::serialize::bigint")]
+    pub raw: paillier::BigInt,
+
+    pub components: u64,
+
+    pub _phantom: std::marker::PhantomData<u64>,
+}
+
+impl LolFuckingEncryptionTypes {
+    pub fn to_pallier_fucking_shit(&self) -> EncodedCiphertext<u64> {
+        EncodedCiphertext {
+            raw: self.raw.clone(),
+            components: self.components as usize,
+            _phantom: self._phantom,
+        }
+    }
+
+    pub fn from_pallier_shit(that: &EncodedCiphertext<u64>) -> Self {
+        Self {
+            raw: that.raw.clone(),
+            components: that.components as u64,
+            _phantom: that._phantom,
+        }
+    }
 }
 
 #[entry_point]
@@ -28,13 +56,19 @@ pub fn execute(
 
     let ek: EncryptionKey = bincode2::deserialize(encryption_key.as_slice()).unwrap();
 
-    let c1: EncodedCiphertext<u64> = bincode2::deserialize(msg.encrypted_c1.as_slice()).unwrap();
-    let c2: EncodedCiphertext<u64> = bincode2::deserialize(msg.encrypted_c2.as_slice()).unwrap();
+    let c1_temp: LolFuckingEncryptionTypes = bincode2::deserialize(msg.encrypted_c1.as_slice()).unwrap();
+    let c2_temp: LolFuckingEncryptionTypes = bincode2::deserialize(msg.encrypted_c1.as_slice()).unwrap();
 
-    // add all of them together
+    let c1 = c1_temp.to_pallier_fucking_shit();
+    let c2 = c2_temp.to_pallier_fucking_shit();
+    // // let c2: EncodedCiphertext<u64> = bincode2::deserialize(msg.encrypted_c2.as_slice()).unwrap();
+    // //
+    // // // add all of them together
     let c = Paillier::add(&ek, &c1, &c2);
 
-    let encrypted_c: Binary = bincode2::serialize(&c).unwrap().into();
+    let c_out = LolFuckingEncryptionTypes::from_pallier_shit(&c);
+
+    let encrypted_c = bincode2::serialize(&c_out).unwrap();
 
     Ok(Response::default().set_data(encrypted_c))
 }
