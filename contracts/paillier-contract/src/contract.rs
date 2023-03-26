@@ -3,7 +3,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::ENCRYPTION_KEY;
 use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use paillier::{Add, EncodedCiphertext, EncryptionKey, Paillier};
-use serde::{Deserialize, Serialize};
+
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
@@ -14,16 +14,6 @@ pub fn instantiate(
     ENCRYPTION_KEY.save(deps.storage, &msg.encryption_key)?;
 
     Ok(Response::default())
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct LolFuckingEncryptionTypes {
-    #[serde(with = "crate::serialize::bigint")]
-    pub raw: paillier::BigInt,
-
-    pub components: u64,
-
-    pub _phantom: std::marker::PhantomData<u64>,
 }
 
 #[entry_point]
