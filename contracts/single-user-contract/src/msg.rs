@@ -1,4 +1,5 @@
 use cosmwasm_std::Binary;
+use scrt_sss::Secp256k1Point;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -15,7 +16,7 @@ pub enum InstantiateMsg {
 pub enum ExecuteMsg {
     Sign {
         message_hash: Binary,
-        public_instance_key_user: Binary,
+        public_instance_key_user: Secp256k1Point,
         proof: Binary,
         commitment: Binary,
     },

@@ -1,7 +1,7 @@
 use crate::errors::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{Config, CONFIG};
-use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{entry_point, Binary, DepsMut, Env, MessageInfo, Response, StdError, StdResult};
 use paillier::{Add, BigInt, EncodedCiphertext, EncryptionKey, Paillier};
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
@@ -36,9 +36,7 @@ pub fn instantiate(
                 bincode2::deserialize(enc_public_key.as_slice()).unwrap();
 
             // chain_signing_key, public_signing_key_chain = ECDSA.Keygen();
-            let mut rng = ChaChaRng::from_seed([0u8; 32]); // rng::thread_rng();
-            let chain_signing_key = Secp256k1Scalar::random(&mut rng);
-            let public_signing_key_chain = Secp256k1Point::generate(&chain_signing_key);
+            let (chain_signing_key, public_signing_key_chain) = ecdsa_keygen([1u8; 32]);
 
             // public_signing_key = chain_signing_key * public_signing_key_user;
             let public_signing_key = public_signing_key_user.clone() * chain_signing_key.clone();
@@ -59,32 +57,90 @@ pub fn instantiate(
     }
 }
 
-// #[entry_point]
-// pub fn execute(
-//     deps: DepsMut,
-//     _env: Env,
-//     _info: MessageInfo,
-//     msg: ExecuteMsg,
-// ) -> Result<Response, ContractError> {
-//     let encryption_key = CONFIG.load(deps.storage)?;
+/// ```
+/// // On-chain
+/// func execute_sign_tx(message_hash, public_instance_key_user, proof, commitment):
+/// 	assert(verify_dlog_proof_and_commitment(public_instance_key_user, proof, commitment); // Just create a stub that returns true for now.
+/// 	encrypted_user_signing_key= load_from_state("encrypted_user_signing_key");
+/// 	chain_signing_key = load_from_state("chain_signing_key");
+///
+/// 	k_chain, public_instance_key_chain = ECDSA.Keygen();
+/// 	public_instance_key = k_chain * public_instance_key_user;
+/// 	r = public_instance_key.x; // Get x-coordinate of the point
+///
+/// 	k_chain_inverse = modular_inverse(k_chain, secp256k1.q);
+/// 	encrypted_chain_sig = k_chain_inverse * r * chain_signing_key * encrypted_user_signing_key + k_chain_inverse * message_hash // This is the homomorphic encryption operation. This is a complicated formula so let me know if it's not clear. Also, TODO: add noise (p*q) later on..
+///
+/// 	return encrypted_chain_sig, public_instance_key_chain
+/// ```
+#[entry_point]
+pub fn execute(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
+    match msg {
+        ExecuteMsg::Sign {
+            message_hash,
+            public_instance_key_user,
+            proof,
+            commitment,
+        } => {
+            // assert(verify_dlog_proof_and_commitment(public_instance_key_user, proof, commitment); // Just create a stub that returns true for now.
+            if !verify_dlog_proof_and_commitment(
+                public_instance_key_user.clone(),
+                proof,
+                commitment,
+            ) {
+                return Err(ContractError::Std(StdError::generic_err(
+                    "Unable to verify dlog proof and commitment",
+                )));
+            }
 
-//     let ek: EncryptionKey = bincode2::deserialize(encryption_key.as_slice()).unwrap();
+            let config = CONFIG.load(deps.storage)?;
+            let encrypted_user_signing_key = config.encrypted_user_signing_key;
+            let chain_signing_key = config.chain_signing_key;
 
-//     let c1: EncodedCiphertext<u64> = bincode2::deserialize(msg.c1.as_slice()).unwrap();
-//     let c2: EncodedCiphertext<u64> = bincode2::deserialize(msg.c2.as_slice()).unwrap();
+            // k_chain, public_instance_key_chain = ECDSA.Keygen();
+            let (k_chain, public_instance_key_chain) = ecdsa_keygen([3u8; 32]);
 
-//     // add all of them together
-//     let c = Paillier::add(&ek, &c1, &c2);
+            // public_instance_key = k_chain * public_instance_key_user;
+            let public_instance_key = public_instance_key_user * k_chain;
 
-//     let c = bincode2::serialize(&c).unwrap();
+            // r = public_instance_key.x; // Get x-coordinate of the point
+            let r = public_instance_key.x();
 
-//     Ok(Response::default().set_data(c))
-// }
+            // k_chain_inverse = modular_inverse(k_chain, secp256k1.q);
+            let k_chain_inverse = modular_inverse(k_chain, secp256k1.q);
+            Ok(Response::default())
+        }
+    }
+}
 
+fn verify_dlog_proof_and_commitment(
+    public_instance_key_user: Secp256k1Point,
+    proof: Binary,
+    commitment: Binary,
+) -> bool {
+    true
+}
+
+fn ecdsa_keygen(seed: [u8; 32]) -> (Secp256k1Scalar, Secp256k1Point) {
+    let mut rng = ChaChaRng::from_seed(seed); // rng::thread_rng();
+    let privkey = Secp256k1Scalar::random(&mut rng);
+    let pubkey = Secp256k1Point::generate(&privkey);
+
+    (privkey, pubkey)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{
+        testing::{mock_dependencies, mock_env, mock_info},
+        Binary,
+    };
+    use paillier::{DecryptionKey, Encrypt, KeyGeneration, Paillier};
 
     /// ```
     /// // User
@@ -104,9 +160,7 @@ mod tests {
         EncodedCiphertext<BigInt>,
     ) {
         // user_signing_key, public_signing_key_user = ECDSA.Keygen();
-        let mut rng = ChaChaRng::from_seed([0u8; 32]); // rng::thread_rng();
-        let user_signing_key = Secp256k1Scalar::random(&mut rng);
-        let public_signing_key_user = Secp256k1Point::generate(&user_signing_key);
+        let (user_signing_key, public_signing_key_user) = ecdsa_keygen([0u8; 32]);
 
         // enc_secret_key, enc_public_key = Paillier.Keygen();
         let (enc_public_key, enc_secret_key) = Paillier::keypair().keys(); // Also ChaChaRng::from_seed([0u8; 32]) behind the scenes
@@ -124,8 +178,45 @@ mod tests {
         )
     }
 
+    ///```
+    /// // User
+    /// func generate_sign_tx(enc_secret_key, message_hash):
+    ///     k_user, public_instance_key_user = ECDSA.Keygen();
+    ///     proof, commitment = generate_dlog_proof_and_commit(k_user, public_instance_key_user); // Just create a stub that returns whatever, don't implement
+    ///    
+    ///     // Send a tx with all the data to the chain. Get encrypted_chain_sig back
+    ///     encrypted_chain_sig, public_instance_key_chain = send_sign_tx(message_hash, public_instance_key_user, proof, commitment);
+    ///    
+    ///     public_instance_key = k_user * public_instance_key_chain;
+    ///     r = public_instance_key.x; // Get x-coordinate of the point
+    ///    
+    ///     chain_sig = Paillier.decrypt(enc_secret_key, encrypted_chain_sig);
+    ///     s = (modular_inverse(k_user, secp256k1.q) * chain_sig) % secp256k1.q;
+    ///    
+    ///     signature = (r, s)
+    ///     return signature;
+    ///  ```
+    fn generate_sign_tx(
+        enc_secret_key: DecryptionKey,
+        message_hash: [u8; 32],
+    ) -> (Secp256k1Point, Binary, Binary) {
+        // k_user, public_instance_key_user = ECDSA.Keygen();
+        let (k_user, public_instance_key_user) = ecdsa_keygen([2u8; 32]);
+
+        // proof, commitment = generate_dlog_proof_and_commit(k_user, public_instance_key_user); // Just create a stub that returns whatever, don't implement
+        let (proof, commitment) = generate_dlog_proof_and_commit(k_user, public_instance_key_user);
+
+        (public_instance_key_user, proof, commitment)
+    }
+
+    fn generate_dlog_proof_and_commit(
+        _k_user: Secp256k1Scalar,
+        _public_instance_key_user: Secp256k1Point,
+    ) -> (Binary, Binary) {
+        (Binary::from(vec![]), Binary::from(vec![]))
+    }
+
     #[test]
-    // #[cfg(feature = "rand-std")]
     fn test() {
         let (
             (user_signing_key, public_signing_key_user),
@@ -156,29 +247,21 @@ mod tests {
         )
         .unwrap();
 
-        // encrypt two values
-        let c1 = Paillier::encrypt(&ek, 10);
-        let c2 = Paillier::encrypt(&ek, 20);
+        let message_hash = [17u8; 32];
 
-        let c1: Binary = bincode2::serialize(&c1).unwrap().into();
-        let c2: Binary = bincode2::serialize(&c2).unwrap().into();
+        let (public_instance_key_user, proof, commitment) =
+            generate_sign_tx(enc_secret_key, message_hash);
 
-        // send the two values to the contract and get their sum
-        let encrypted_c = execute(
+        execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("creator", &[]),
-            ExecuteMsg { c1, c2 },
+            mock_info("yolo", &[]),
+            ExecuteMsg::Sign {
+                encrypted_user_signing_key,
+                public_signing_key_user,
+                enc_public_key,
+            },
         )
-        .unwrap()
-        .data
         .unwrap();
-
-        let c: EncodedCiphertext<u64> = bincode2::deserialize(encrypted_c.as_slice()).unwrap();
-
-        // decrypt final result
-        let m: u64 = Paillier::decrypt(&dk, &c);
-
-        println!("decrypted total sum is {}", m);
     }
 }
