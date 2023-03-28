@@ -2,7 +2,7 @@ use crate::errors::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{Config, CONFIG};
 use cosmwasm_std::{entry_point, Binary, DepsMut, Env, MessageInfo, Response, StdError, StdResult};
-use paillier::{Add, BigInt, EncodedCiphertext, EncryptionKey, Paillier};
+use paillier::{Add, BigInt, EncodedCiphertext, EncryptionKey, Mul, Paillier};
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use scrt_sss::{ECPoint, ECScalar, Secp256k1Point, Secp256k1Scalar};
@@ -99,6 +99,7 @@ pub fn execute(
             }
 
             let config = CONFIG.load(deps.storage)?;
+            let enc_public_key = config.enc_public_key;
             let encrypted_user_signing_key = config.encrypted_user_signing_key;
             let chain_signing_key = config.chain_signing_key;
 
@@ -106,14 +107,46 @@ pub fn execute(
             let (k_chain, public_instance_key_chain) = ecdsa_keygen([3u8; 32]);
 
             // public_instance_key = k_chain * public_instance_key_user;
-            let public_instance_key = public_instance_key_user * k_chain;
+            let public_instance_key = public_instance_key_user * k_chain.clone();
 
             // r = public_instance_key.x; // Get x-coordinate of the point
             let r = public_instance_key.x();
 
             // k_chain_inverse = modular_inverse(k_chain, secp256k1.q);
-            let k_chain_inverse = modular_inverse(k_chain, secp256k1.q);
-            Ok(Response::default())
+            let k_chain_inverse = k_chain.inv();
+
+            // encrypted_chain_sig = k_chain_inverse * r * chain_signing_key * encrypted_user_signing_key + k_chain_inverse * message_hash // This is the homomorphic encryption operation. This is a complicated formula so let me know if it's not clear. Also, TODO: add noise (p*q) later on..
+
+            let k_chain_inverse_mul_r_mul_chain_signing_key = BigInt::from_str_radix(
+                &(k_chain_inverse.clone() * r * chain_signing_key).to_hex(),
+                16,
+            )
+            .unwrap();
+            let k_chain_inverse_mul_message_hash =
+                BigInt::from_str_radix(&(k_chain_inverse * message_hash).to_hex(), 16).unwrap();
+
+            let encrypted_chain_sig = Paillier::add(
+                &enc_public_key,
+                Paillier::mul(
+                    &enc_public_key,
+                    encrypted_user_signing_key,
+                    k_chain_inverse_mul_r_mul_chain_signing_key,
+                ),
+                k_chain_inverse_mul_message_hash,
+            );
+
+            let encrypted_chain_sig: Binary =
+                bincode2::serialize(&encrypted_chain_sig).unwrap().into();
+            let public_instance_key_chain: Binary = bincode2::serialize(&public_instance_key_chain)
+                .unwrap()
+                .into();
+
+            let result: Binary =
+                bincode2::serialize(&(encrypted_chain_sig, public_instance_key_chain))
+                    .unwrap()
+                    .into();
+
+            Ok(Response::default().set_data(result))
         }
     }
 }
@@ -140,7 +173,7 @@ mod tests {
         testing::{mock_dependencies, mock_env, mock_info},
         Binary,
     };
-    use paillier::{DecryptionKey, Encrypt, KeyGeneration, Paillier};
+    use paillier::{Decrypt, DecryptionKey, Encrypt, KeyGeneration, Paillier};
 
     /// ```
     /// // User
@@ -197,16 +230,17 @@ mod tests {
     ///     return signature;
     ///  ```
     fn generate_sign_tx(
-        enc_secret_key: DecryptionKey,
-        message_hash: [u8; 32],
-    ) -> (Secp256k1Point, Binary, Binary) {
+        enc_secret_key: &DecryptionKey,
+        message_hash: Secp256k1Scalar,
+    ) -> (Secp256k1Scalar, Secp256k1Point, Binary, Binary) {
         // k_user, public_instance_key_user = ECDSA.Keygen();
         let (k_user, public_instance_key_user) = ecdsa_keygen([2u8; 32]);
 
         // proof, commitment = generate_dlog_proof_and_commit(k_user, public_instance_key_user); // Just create a stub that returns whatever, don't implement
-        let (proof, commitment) = generate_dlog_proof_and_commit(k_user, public_instance_key_user);
+        let (proof, commitment) =
+            generate_dlog_proof_and_commit(k_user.clone(), public_instance_key_user.clone());
 
-        (public_instance_key_user, proof, commitment)
+        (k_user, public_instance_key_user, proof, commitment)
     }
 
     fn generate_dlog_proof_and_commit(
@@ -247,21 +281,47 @@ mod tests {
         )
         .unwrap();
 
-        let message_hash = [17u8; 32];
+        let message_hash = Secp256k1Scalar::from_slice(&[17u8; 32]).unwrap();
 
-        let (public_instance_key_user, proof, commitment) =
-            generate_sign_tx(enc_secret_key, message_hash);
+        let (k_user, public_instance_key_user, proof, commitment) =
+            generate_sign_tx(&enc_secret_key, message_hash.clone());
 
-        execute(
+        let result = execute(
             deps.as_mut(),
             mock_env(),
             mock_info("yolo", &[]),
             ExecuteMsg::Sign {
-                encrypted_user_signing_key,
-                public_signing_key_user,
-                enc_public_key,
+                message_hash,
+                public_instance_key_user,
+                proof,
+                commitment,
             },
         )
+        .unwrap()
+        .data
         .unwrap();
+
+        let (encrypted_chain_sig, public_instance_key_chain): (Binary, Binary) =
+            bincode2::deserialize(result.as_slice()).unwrap();
+        let encrypted_chain_sig: EncodedCiphertext<BigInt> =
+            bincode2::deserialize(encrypted_chain_sig.as_slice()).unwrap();
+        let public_instance_key_chain: Secp256k1Point =
+            bincode2::deserialize(public_instance_key_chain.as_slice()).unwrap();
+
+        // public_instance_key = k_user * public_instance_key_chain;
+        let public_instance_key = public_instance_key_chain * k_user.clone();
+
+        // r = public_instance_key.x; // Get x-coordinate of the point
+        let r = public_instance_key.x();
+
+        // chain_sig = Paillier.decrypt(enc_secret_key, encrypted_chain_sig);
+        let chain_sig = Paillier::decrypt(&enc_secret_key, encrypted_chain_sig);
+
+        // s = (modular_inverse(k_user, secp256k1.q) * chain_sig) % secp256k1.q;
+        let s =
+            k_user.inv() * Secp256k1Scalar::from_str(&chain_sig.to_str_radix(16, false)).unwrap();
+
+        // signature = (r, s)
+        let signature = (r, s);
     }
 }

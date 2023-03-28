@@ -1,5 +1,5 @@
 use cosmwasm_std::Binary;
-use scrt_sss::Secp256k1Point;
+use scrt_sss::{Secp256k1Point, Secp256k1Scalar};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -15,7 +15,7 @@ pub enum InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     Sign {
-        message_hash: Binary,
+        message_hash: Secp256k1Scalar,
         public_instance_key_user: Secp256k1Point,
         proof: Binary,
         commitment: Binary,
