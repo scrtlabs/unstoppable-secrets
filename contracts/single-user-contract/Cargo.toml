@@ -1,0 +1,46 @@
+[package]
+name = "unstoppable_secrets_single_user"
+version = "0.1.0"
+authors = ["SecretTemplateExample"]
+edition = "2021"
+exclude = [
+  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+  "contract.wasm",
+  "hash.txt",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# for quicker tests, cargo test --lib
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces"]
+schema = ["cosmwasm-schema"]
+
+[dependencies]
+serde = { version = "1.0.147", default-features = false, features = ["derive"] }
+schemars = "0.8.11"
+cosmwasm-std = { git = "https://github.com/scrtlabs/cosmwasm", rev = "f7e2b1dbf11e113e258d796288752503a5012367" }
+cosmwasm-storage = { git = "https://github.com/scrtlabs/cosmwasm", rev = "f7e2b1dbf11e113e258d796288752503a5012367" }
+cw-storage-plus = { version = "0.14.0", default-features = false }
+cosmwasm-schema = { version = "1.1.0", optional = true }
+thiserror = "1.0"
+bincode2 = "2.0.1"
+paillier = { git = "https://github.com/scrtlabs/rust-paillier", branch = "secret-paillier-0.2.x" }
+libsecp256k1 = { git = "https://github.com/cashmaney/libsecp256k1", branch = "wasm", default-features = false, features = [
+  "static-context",
+  "wasm",
+  "hmac"
+] }
+rand_core = { version = "0.6.4", default-features = false }
+rand_chacha = { version = "0.3.1", default-features = false }
+scrt_sss = { path = "../../packages/sss" }
+
+[dev-dependencies]
+
+[[bin]]
+name = "schema"
+required-features = ["schema"]

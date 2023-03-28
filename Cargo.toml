@@ -3,7 +3,8 @@ members = [
     "packages/ec_curve",
     "packages/sss",
     "contracts/sss-contract",
-    "contracts/paillier-contract"
+    "contracts/paillier-contract",
+    "contracts/single-user-contract"
 ]
 resolver = "2"
 
