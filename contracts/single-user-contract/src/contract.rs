@@ -316,10 +316,10 @@ mod tests {
 
         // chain_sig = Paillier.decrypt(enc_secret_key, encrypted_chain_sig);
         let chain_sig = Paillier::decrypt(&enc_secret_key, encrypted_chain_sig);
+        let chain_sig = chain_sig.to_str_radix(16, false);
 
         // s = (modular_inverse(k_user, secp256k1.q) * chain_sig) % secp256k1.q;
-        let s =
-            k_user.inv() * Secp256k1Scalar::from_str(&chain_sig.to_str_radix(16, false)).unwrap();
+        let s = k_user.inv() * Secp256k1Scalar::from_str(&chain_sig).unwrap();
 
         // signature = (r, s)
         let signature = (r, s);
