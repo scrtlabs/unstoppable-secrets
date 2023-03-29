@@ -1,4 +1,3 @@
-use cosmwasm_std::Binary;
 use cw_storage_plus::Item;
 use paillier::{BigInt, EncodedCiphertext, EncryptionKey};
 use scrt_sss::{Secp256k1Point, Secp256k1Scalar};
@@ -14,4 +13,4 @@ pub struct Config {
     pub public_signing_key: Secp256k1Point,
 }
 
-pub const CONFIG: Item<Config> = Item::new("encryption_key");
+pub const CONFIG: Item<Config> = Item::new("config");

@@ -157,9 +157,9 @@ pub fn execute(
 }
 
 fn verify_dlog_proof_and_commitment(
-    public_instance_key_user: Secp256k1Point,
-    proof: Binary,
-    commitment: Binary,
+    _public_instance_key_user: Secp256k1Point,
+    _proof: Binary,
+    _commitment: Binary,
 ) -> bool {
     true
 }
@@ -333,7 +333,7 @@ mod tests {
         let s = k_user.inv() * Secp256k1Scalar::from_str(&chain_sig).unwrap();
 
         // signature = (r, s)
-        let signature = (r.clone(), s.clone());
+        let _signature = (r.clone(), s.clone());
 
         // pubkey is dereived using ECDH:
         // pubkey = user_signing_key * chain_signing_key * G

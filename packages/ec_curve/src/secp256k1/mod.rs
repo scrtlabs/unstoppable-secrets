@@ -9,8 +9,6 @@
 // extern crate rand_core;
 // extern crate secp256k1;
 
-use self::scalar::Secp256k1Scalar;
-
 use super::Error;
 
 /// The order of the secp256k1 curve
