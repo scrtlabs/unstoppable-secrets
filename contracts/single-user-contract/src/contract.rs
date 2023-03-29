@@ -327,6 +327,15 @@ mod tests {
 
         // chain_sig = Paillier.decrypt(enc_secret_key, encrypted_chain_sig);
         let chain_sig = Paillier::decrypt(&enc_secret_key, encrypted_chain_sig);
+
+        // secp256k1_order aka n aka q
+        // source: https://en.bitcoin.it/wiki/Secp256k1
+        let secp256k1_order = BigInt::from_str_radix(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+            16,
+        )
+        .unwrap();
+        let chain_sig = chain_sig.pow_mod(&BigInt::one(), &secp256k1_order);
         let chain_sig = chain_sig.to_str_radix(16, false);
 
         // s = (modular_inverse(k_user, secp256k1.q) * chain_sig) % secp256k1.q;
@@ -340,6 +349,9 @@ mod tests {
         // pubkey = user_signing_key * public_signing_key_chain
         // pubkey = chain_signing_key * public_signing_key_user
         let pubkey = public_signing_key_chain * user_signing_key;
+        let mut pubkey_uncompressed = vec![];
+        pubkey_uncompressed.extend_from_slice(&[0x04u8]); // uncompressed pubkey prefix
+        pubkey_uncompressed.extend_from_slice(&pubkey.to_slice());
 
         // verify signature:
 
@@ -352,7 +364,7 @@ mod tests {
         signature_compact.extend_from_slice(&s.to_raw());
         let sig = secp256k1::ecdsa::Signature::from_compact(&signature_compact).unwrap();
 
-        let public_key = secp256k1::PublicKey::from_slice(&pubkey.to_slice()).unwrap();
+        let public_key = secp256k1::PublicKey::from_slice(&pubkey_uncompressed).unwrap();
 
         assert!(secp.verify_ecdsa(&message, &sig, &public_key).is_ok());
     }

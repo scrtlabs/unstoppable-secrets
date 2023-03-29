@@ -3,6 +3,7 @@ use scrt_sss::{Secp256k1Point, Secp256k1Scalar};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum InstantiateMsg {
     KeyGen {
         encrypted_user_signing_key: Binary,
