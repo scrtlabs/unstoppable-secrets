@@ -45,14 +45,19 @@ pub fn instantiate(
                 deps.storage,
                 &Config {
                     chain_signing_key,
-                    public_signing_key_chain,
+                    public_signing_key_chain: public_signing_key_chain.clone(),
                     encrypted_user_signing_key,
                     public_signing_key_user,
                     enc_public_key,
                     public_signing_key,
                 },
             )?;
-            Ok(Response::default())
+
+            let public_signing_key_chain: Binary = bincode2::serialize(&public_signing_key_chain)
+                .unwrap()
+                .into();
+
+            Ok(Response::default().set_data(public_signing_key_chain))
         }
     }
 }
@@ -174,6 +179,7 @@ mod tests {
         Binary,
     };
     use paillier::{Decrypt, DecryptionKey, Encrypt, KeyGeneration, Paillier};
+    use secp256k1::Secp256k1;
 
     /// ```
     /// // User
@@ -269,7 +275,7 @@ mod tests {
         let enc_public_key: Binary = bincode2::serialize(&enc_public_key).unwrap().into();
 
         // send encryption_key to the contract
-        instantiate(
+        let result = instantiate(
             deps.as_mut(),
             mock_env(),
             mock_info("yolo", &[]),
@@ -279,7 +285,12 @@ mod tests {
                 enc_public_key,
             },
         )
+        .unwrap()
+        .data
         .unwrap();
+
+        let public_signing_key_chain: Secp256k1Point =
+            bincode2::deserialize(result.as_slice()).unwrap();
 
         let message_hash = Secp256k1Scalar::from_slice(&[17u8; 32]).unwrap();
 
@@ -291,7 +302,7 @@ mod tests {
             mock_env(),
             mock_info("yolo", &[]),
             ExecuteMsg::Sign {
-                message_hash,
+                message_hash: message_hash.clone(),
                 public_instance_key_user,
                 proof,
                 commitment,
@@ -322,6 +333,27 @@ mod tests {
         let s = k_user.inv() * Secp256k1Scalar::from_str(&chain_sig).unwrap();
 
         // signature = (r, s)
-        let signature = (r, s);
+        let signature = (r.clone(), s.clone());
+
+        // pubkey is dereived using ECDH:
+        // pubkey = user_signing_key * chain_signing_key * G
+        // pubkey = user_signing_key * public_signing_key_chain
+        // pubkey = chain_signing_key * public_signing_key_user
+        let pubkey = public_signing_key_chain * user_signing_key;
+
+        // verify signature:
+
+        let secp = Secp256k1::new();
+
+        let message = secp256k1::Message::from_slice(&message_hash.to_raw()).unwrap();
+
+        let mut signature_compact = vec![];
+        signature_compact.extend_from_slice(&r.to_raw());
+        signature_compact.extend_from_slice(&s.to_raw());
+        let sig = secp256k1::ecdsa::Signature::from_compact(&signature_compact).unwrap();
+
+        let public_key = secp256k1::PublicKey::from_slice(&pubkey.to_slice()).unwrap();
+
+        assert!(secp.verify_ecdsa(&message, &sig, &public_key).is_ok());
     }
 }
