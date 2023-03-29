@@ -236,8 +236,8 @@ mod tests {
     ///     return signature;
     ///  ```
     fn generate_sign_tx(
-        enc_secret_key: &DecryptionKey,
-        message_hash: Secp256k1Scalar,
+        _enc_secret_key: &DecryptionKey,
+        _message_hash: Secp256k1Scalar,
     ) -> (Secp256k1Scalar, Secp256k1Point, Binary, Binary) {
         // k_user, public_instance_key_user = ECDSA.Keygen();
         let (k_user, public_instance_key_user) = ecdsa_keygen([2u8; 32]);
