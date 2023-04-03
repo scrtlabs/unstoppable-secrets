@@ -274,6 +274,21 @@ mod tests {
             .into();
         let enc_public_key: Binary = bincode2::serialize(&enc_public_key).unwrap().into();
 
+        println!("init: {{");
+        println!(
+            "\"encrypted_user_signing_key\": {},",
+            serde_json_wasm::to_string(&encrypted_user_signing_key).unwrap()
+        );
+        println!(
+            "\"public_signing_key_user\": {},",
+            serde_json_wasm::to_string(&public_signing_key_user).unwrap()
+        );
+        println!(
+            "\"enc_public_key\": {},",
+            serde_json_wasm::to_string(&enc_public_key).unwrap()
+        );
+        println!("}}");
+
         // send encryption_key to the contract
         let result = instantiate(
             deps.as_mut(),
@@ -296,6 +311,25 @@ mod tests {
 
         let (k_user, public_instance_key_user, proof, commitment) =
             generate_sign_tx(&enc_secret_key, message_hash.clone());
+
+        println!("exec: {{");
+        println!(
+            "\"message_hash\": {},",
+            serde_json_wasm::to_string(&message_hash).unwrap()
+        );
+        println!(
+            "\"public_instance_key_user\": {},",
+            serde_json_wasm::to_string(&public_instance_key_user).unwrap()
+        );
+        println!(
+            "\"proof\": {},",
+            serde_json_wasm::to_string(&proof).unwrap()
+        );
+        println!(
+            "\"commitment\": {},",
+            serde_json_wasm::to_string(&commitment).unwrap()
+        );
+        println!("}}");
 
         let result = execute(
             deps.as_mut(),

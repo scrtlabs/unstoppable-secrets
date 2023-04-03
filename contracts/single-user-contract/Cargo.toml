@@ -41,6 +41,7 @@ scrt_sss = { path = "../../packages/sss" }
 
 [dev-dependencies]
 secp256k1 = "0.27.0"
+serde-json-wasm = "0.2.1"
 
 [[bin]]
 name = "schema"
