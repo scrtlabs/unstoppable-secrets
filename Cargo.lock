@@ -1891,6 +1891,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "unstoppable_secrets_single_user_sell"
+version = "0.1.0"
+dependencies = [
+ "bincode2",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "libsecp256k1",
+ "paillier",
+ "rand_chacha",
+ "rand_core 0.6.4",
+ "schemars",
+ "scrt_sss",
+ "secp256k1 0.27.0",
+ "serde",
+ "serde-json-wasm 0.2.3",
+ "thiserror",
+]
+
+[[package]]
 name = "unstoppable_secrets_sss"
 version = "0.1.0"
 dependencies = [

@@ -4,7 +4,8 @@ members = [
     "packages/sss",
     "contracts/sss-contract",
     "contracts/paillier-contract",
-    "contracts/single-user-contract"
+    "contracts/single-user-contract",
+    "contracts/single-user-sell-contract"
 ]
 resolver = "2"
 
