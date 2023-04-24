@@ -306,10 +306,10 @@ fn sell(
 
     let public_signing_key_chain = secp256k1_g * chain_signing_key.clone();
 
+    config.enc_public_key = buyer_enc_public_key;
+    config.encrypted_user_signing_key = encrypted_user_signing_key;
     config.chain_signing_key = chain_signing_key;
     config.public_signing_key_chain = public_signing_key_chain;
-    config.encrypted_user_signing_key = encrypted_user_signing_key;
-    config.enc_public_key = buyer_enc_public_key;
 
     CONFIG.save(deps.storage, &config)?;
 
