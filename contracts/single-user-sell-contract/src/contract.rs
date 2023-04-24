@@ -296,7 +296,7 @@ fn sell(
 
     // https://en.bitcoin.it/wiki/Secp256k1
     let secp256k1_g = Secp256k1Point::from_str(
-        "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+        "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8",
     )
     .unwrap();
 
@@ -434,13 +434,13 @@ mod tests {
     /// ```
     fn seller(
         user_signing_key: Secp256k1Scalar,
-        buyer_enc_public_key: EncryptionKey,
+        buyer_enc_public_key: &EncryptionKey,
     ) -> (EncodedCiphertext<BigInt>, Binary) {
         // TODO: generate proof that this encryption encrypted user_signing_key under the buyer's key. Guy needs to look into key-gen protocol to better define this.
         let proof = Binary::from(vec![]);
 
         let encrypted_buyer_signing_key: EncodedCiphertext<BigInt> = Paillier::encrypt(
-            &buyer_enc_public_key,
+            buyer_enc_public_key,
             BigInt::from_str_radix(&user_signing_key.to_hex(), 16).unwrap(),
         );
 
@@ -573,7 +573,7 @@ mod tests {
         // pubkey = user_signing_key * chain_signing_key * G
         // pubkey = user_signing_key * public_signing_key_chain
         // pubkey = chain_signing_key * public_signing_key_user
-        let pubkey = public_signing_key_chain * user_signing_key;
+        let pubkey = public_signing_key_chain.clone() * user_signing_key.clone();
         let mut pubkey_uncompressed = vec![];
         pubkey_uncompressed.extend_from_slice(&[0x04u8]); // uncompressed pubkey prefix
         pubkey_uncompressed.extend_from_slice(&pubkey.to_slice());
@@ -610,7 +610,8 @@ mod tests {
             },
         );
 
-        let (encrypted_buyer_signing_key, proof) = seller(user_signing_key, buyer_enc_public_key);
+        let (encrypted_buyer_signing_key, proof) =
+            seller(user_signing_key.clone(), &buyer_enc_public_key);
 
         let encrypted_buyer_signing_key: Binary = bincode2::serialize(&encrypted_buyer_signing_key)
             .unwrap()
@@ -673,7 +674,7 @@ mod tests {
             16,
         )
         .unwrap();
-        let chain_sig = chain_sig.pow_mod(&BigInt::one(), &secp256k1_order);
+        let chain_sig = chain_sig.pow_mod(&BigInt::one(), &secp256k1_order); // modolu on chain_sig because it's not necessarily in the 2^256 filed
         let chain_sig = chain_sig.to_str_radix(16, false);
 
         // s = (modular_inverse(k_user, secp256k1.q) * chain_sig) % secp256k1.q;
@@ -686,10 +687,10 @@ mod tests {
         // pubkey = user_signing_key * chain_signing_key * G
         // pubkey = user_signing_key * public_signing_key_chain
         // pubkey = chain_signing_key * public_signing_key_user
-        let pubkey = public_signing_key_chain * user_signing_key;
-        let mut pubkey_uncompressed = vec![];
-        pubkey_uncompressed.extend_from_slice(&[0x04u8]); // uncompressed pubkey prefix
-        pubkey_uncompressed.extend_from_slice(&pubkey.to_slice());
+        let pubkey2 = public_signing_key_chain * user_signing_key;
+        let mut pubkey2_uncompressed = vec![];
+        pubkey2_uncompressed.extend_from_slice(&[0x04u8]); // uncompressed pubkey prefix
+        pubkey2_uncompressed.extend_from_slice(&pubkey2.to_slice());
 
         // verify signature:
 
@@ -702,8 +703,9 @@ mod tests {
         signature_compact.extend_from_slice(&s.to_raw());
         let sig = secp256k1::ecdsa::Signature::from_compact(&signature_compact).unwrap();
 
-        let public_key = secp256k1::PublicKey::from_slice(&pubkey_uncompressed).unwrap();
+        let public_key2 = secp256k1::PublicKey::from_slice(&pubkey2_uncompressed).unwrap();
 
-        assert!(secp.verify_ecdsa(&message, &sig, &public_key).is_ok());
+        assert!(secp.verify_ecdsa(&message, &sig, &public_key2).is_ok());
+        assert!(pubkey_uncompressed.eq(&pubkey2_uncompressed));
     }
 }
