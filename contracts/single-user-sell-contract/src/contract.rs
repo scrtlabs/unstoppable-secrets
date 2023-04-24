@@ -712,13 +712,7 @@ mod tests {
 
         let public_key2 = secp256k1::PublicKey::from_slice(&pubkey2_uncompressed).unwrap();
 
-        println!("pubkey_uncompressed: {:?}", pubkey_uncompressed);
-        println!("pubkey2_uncompressed: {:?}", pubkey2_uncompressed);
-
-        let x = secp.verify_ecdsa(&message, &sig, &public_key2);
-        println!("x: {:?}", x);
-
-        assert!(x.is_ok());
+        assert!(secp.verify_ecdsa(&message, &sig, &public_key2).is_ok());
         assert!(pubkey_uncompressed.eq(&pubkey2_uncompressed));
     }
 }
