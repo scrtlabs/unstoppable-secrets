@@ -20,6 +20,8 @@ pub enum ExecuteMsg {
         public_instance_key_user: Secp256k1Point,
         proof: Binary,
         commitment: Binary,
+        /// TODO replace with env.block.random
+        seed: u8,
     },
     Bid {
         buyer_enc_public_key: Binary,

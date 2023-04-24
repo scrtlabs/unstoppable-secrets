@@ -80,12 +80,14 @@ pub fn execute(
             public_instance_key_user,
             proof,
             commitment,
+            seed,
         } => sign(
             message_hash,
             public_instance_key_user,
             proof,
             commitment,
             deps,
+            seed,
         ),
         ExecuteMsg::Bid {
             buyer_enc_public_key,
@@ -152,6 +154,7 @@ fn sign(
     proof: Binary,
     commitment: Binary,
     deps: DepsMut,
+    seed: u8,
 ) -> Result<Response, ContractError> {
     // assert(verify_dlog_proof_and_commitment(public_instance_key_user, proof, commitment); // Just create a stub that returns true for now.
     if !verify_dlog_proof_and_commitment(public_instance_key_user.clone(), proof, commitment) {
@@ -166,7 +169,8 @@ fn sign(
     let chain_signing_key = config.chain_signing_key;
 
     // k_chain, public_instance_key_chain = ECDSA.Keygen();
-    let (k_chain, public_instance_key_chain) = ecdsa_keygen([3u8; 32]);
+    let (k_chain, public_instance_key_chain) =
+        ecdsa_keygen([seed /* TODO replace with env.block.random */ ; 32]);
 
     // public_instance_key = k_chain * public_instance_key_user;
     let public_instance_key = public_instance_key_user * k_chain.clone();
@@ -305,6 +309,7 @@ fn sell(
     config.chain_signing_key = chain_signing_key;
     config.public_signing_key_chain = public_signing_key_chain;
     config.encrypted_user_signing_key = encrypted_user_signing_key;
+    config.enc_public_key = buyer_enc_public_key;
 
     CONFIG.save(deps.storage, &config)?;
 
@@ -531,6 +536,7 @@ mod tests {
                 public_instance_key_user,
                 proof,
                 commitment,
+                seed: 3,
             },
         )
         .unwrap()
@@ -645,6 +651,7 @@ mod tests {
                 public_instance_key_user,
                 proof,
                 commitment,
+                seed: 4,
             },
         )
         .unwrap()
@@ -705,7 +712,13 @@ mod tests {
 
         let public_key2 = secp256k1::PublicKey::from_slice(&pubkey2_uncompressed).unwrap();
 
-        assert!(secp.verify_ecdsa(&message, &sig, &public_key2).is_ok());
+        println!("pubkey_uncompressed: {:?}", pubkey_uncompressed);
+        println!("pubkey2_uncompressed: {:?}", pubkey2_uncompressed);
+
+        let x = secp.verify_ecdsa(&message, &sig, &public_key2);
+        println!("x: {:?}", x);
+
+        assert!(x.is_ok());
         assert!(pubkey_uncompressed.eq(&pubkey2_uncompressed));
     }
 }
