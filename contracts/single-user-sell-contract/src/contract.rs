@@ -672,7 +672,7 @@ mod tests {
         let r = public_instance_key.x();
 
         // chain_sig = Paillier.decrypt(enc_secret_key, encrypted_chain_sig);
-        let chain_sig = Paillier::decrypt(&enc_secret_key, encrypted_chain_sig);
+        let chain_sig = Paillier::decrypt(&buyer_enc_secret_key, encrypted_chain_sig);
 
         // secp256k1_order aka n aka q
         // source: https://en.bitcoin.it/wiki/Secp256k1
