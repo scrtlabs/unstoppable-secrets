@@ -323,6 +323,8 @@ fn sell(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use super::*;
     use cosmwasm_std::{
         testing::{mock_dependencies, mock_env, mock_info},
@@ -486,6 +488,7 @@ mod tests {
         // println!("}}");
 
         // send encryption_key to the contract
+        let start = Instant::now();
         let result = instantiate(
             deps.as_mut(),
             mock_env(),
@@ -499,6 +502,8 @@ mod tests {
         .unwrap()
         .data
         .unwrap();
+        let duration = start.elapsed();
+        println!("keygen: {}", duration.as_nanos());
 
         let public_signing_key_chain: Secp256k1Point =
             bincode2::deserialize(result.as_slice()).unwrap();
@@ -527,6 +532,7 @@ mod tests {
         // );
         // println!("}}");
 
+        let start = Instant::now();
         let result = execute(
             deps.as_mut(),
             mock_env(),
@@ -542,6 +548,8 @@ mod tests {
         .unwrap()
         .data
         .unwrap();
+        let duration = start.elapsed();
+        println!("sign: {}", duration.as_nanos());
 
         let (encrypted_chain_sig, public_instance_key_chain): (Binary, Binary) =
             bincode2::deserialize(result.as_slice()).unwrap();
@@ -606,6 +614,18 @@ mod tests {
         let buyer_enc_public_key_binary: Binary =
             bincode2::serialize(&buyer_enc_public_key).unwrap().into();
 
+        println!("bid: {{");
+        println!(
+            "\"buyer_enc_public_key\": {},",
+            serde_json_wasm::to_string(&buyer_enc_public_key_binary).unwrap()
+        );
+        println!(
+            "\"proof\": {},",
+            serde_json_wasm::to_string(&proof).unwrap()
+        );
+        println!("}}");
+
+        let start = Instant::now();
         let _result = execute(
             deps.as_mut(),
             mock_env(),
@@ -615,6 +635,8 @@ mod tests {
                 proof,
             },
         );
+        let duration = start.elapsed();
+        println!("bid: {}", duration.as_nanos());
 
         let (encrypted_buyer_signing_key, proof) =
             seller(user_signing_key.clone(), &buyer_enc_public_key);
@@ -625,6 +647,27 @@ mod tests {
         let buyer_enc_public_key: Binary =
             bincode2::serialize(&buyer_enc_public_key).unwrap().into();
 
+        println!("sell: {{");
+        println!(
+            "\"encrypted_buyer_signing_key\": {},",
+            serde_json_wasm::to_string(&encrypted_buyer_signing_key).unwrap()
+        );
+        println!(
+            "\"buyer_enc_public_key\": {},",
+            serde_json_wasm::to_string(&buyer_enc_public_key).unwrap()
+        );
+        println!(
+            "\"proof\": {},",
+            serde_json_wasm::to_string(&proof).unwrap()
+        );
+        println!(
+            "\"payment_address\": {},",
+            serde_json_wasm::to_string(&"seller").unwrap()
+        );
+        println!("}}");
+
+        let start = Instant::now();
+        let duration = start.elapsed();
         let _result = execute(
             deps.as_mut(),
             mock_env(),
@@ -636,6 +679,7 @@ mod tests {
                 payment_address: "seller".to_string(),
             },
         );
+        println!("sell: {}", duration.as_nanos());
 
         let message_hash = Secp256k1Scalar::from_slice(&[18u8; 32]).unwrap();
 
