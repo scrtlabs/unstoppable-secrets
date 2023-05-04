@@ -20,5 +20,6 @@ pub enum ExecuteMsg {
         public_instance_key_user: Secp256k1Point,
         proof: Binary,
         commitment: Binary,
+        seed: u8,
     },
 }

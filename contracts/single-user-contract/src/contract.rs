@@ -2,9 +2,9 @@ use crate::errors::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{Config, CONFIG};
 use cosmwasm_std::{entry_point, Binary, DepsMut, Env, MessageInfo, Response, StdError, StdResult};
-use paillier::{Add, BigInt, EncodedCiphertext, EncryptionKey, Mul, Paillier};
+use paillier::{Add, BigInt, EncodedCiphertext, Encrypt, EncryptionKey, Mul, Paillier};
 use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
+use rand_core::{RngCore, SeedableRng};
 use scrt_sss::{ECPoint, ECScalar, Secp256k1Point, Secp256k1Scalar};
 
 /// // On-chain
@@ -91,6 +91,7 @@ pub fn execute(
             public_instance_key_user,
             proof,
             commitment,
+            seed,
         } => {
             // assert(verify_dlog_proof_and_commitment(public_instance_key_user, proof, commitment); // Just create a stub that returns true for now.
             if !verify_dlog_proof_and_commitment(
@@ -130,6 +131,33 @@ pub fn execute(
             let k_chain_inverse_mul_message_hash =
                 BigInt::from_str_radix(&(k_chain_inverse * message_hash).to_hex(), 16).unwrap();
 
+            let encrypted_k_chain_inverse_mul_message_hash: EncodedCiphertext<BigInt> =
+                Paillier::encrypt(&enc_public_key, k_chain_inverse_mul_message_hash);
+
+            // noisy_value = (random between 1 and (secp256k1.q)^2) * secp256k1.q
+
+            let secp256k1_q = BigInt::from_str_radix(
+                "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+                16,
+            )
+            .unwrap();
+
+            let secp256k1_q_pow2 = secp256k1_q.clone() * secp256k1_q.clone();
+
+            let rng = &mut ChaChaRng::from_seed([seed /* TODO: use env.block.random */; 32]);
+            let noisy_value: BigInt = loop {
+                let noisy_value = rng.next_u64();
+                if noisy_value > 1 && noisy_value < secp256k1_q_pow2 {
+                    break BigInt::from(noisy_value) * secp256k1_q.clone();
+                }
+            };
+
+            let encrypted_noisy_value = Paillier::add(
+                &enc_public_key,
+                encrypted_k_chain_inverse_mul_message_hash,
+                noisy_value,
+            );
+
             let encrypted_chain_sig = Paillier::add(
                 &enc_public_key,
                 Paillier::mul(
@@ -137,7 +165,7 @@ pub fn execute(
                     encrypted_user_signing_key,
                     k_chain_inverse_mul_r_mul_chain_signing_key,
                 ),
-                k_chain_inverse_mul_message_hash,
+                encrypted_noisy_value,
             );
 
             let encrypted_chain_sig: Binary =
@@ -340,6 +368,7 @@ mod tests {
                 public_instance_key_user,
                 proof,
                 commitment,
+                seed: 3,
             },
         )
         .unwrap()
