@@ -52,6 +52,8 @@ bincode2 = "2.0.1"
 ethereum-types = "0.14.1"
 rlp = "0.5.2"
 ethereum-tx-sign = "6.1.0"
+# getrandom is indirect dependency but we need to make it work in wasm
+getrandom = { version = "0.2", features = ["js"] }
 
 #
 #ursa_sharing = { version = "0.1.0", git = "https://github.com/hyperledger/ursa"}
