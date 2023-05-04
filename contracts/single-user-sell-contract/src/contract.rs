@@ -5,9 +5,9 @@ use cosmwasm_std::{
     entry_point, Addr, BankMsg, Binary, Coin, CosmosMsg, DepsMut, Env, MessageInfo, Response,
     StdError, StdResult,
 };
-use paillier::{Add, BigInt, EncodedCiphertext, EncryptionKey, Mul, Paillier};
+use paillier::{Add, BigInt, EncodedCiphertext, Encrypt, EncryptionKey, Mul, Paillier};
 use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
+use rand_core::{RngCore, SeedableRng};
 use scrt_sss::{ECPoint, ECScalar, Secp256k1Point, Secp256k1Scalar};
 
 /// // On-chain
@@ -181,7 +181,7 @@ fn sign(
     // k_chain_inverse = modular_inverse(k_chain, secp256k1.q);
     let k_chain_inverse = k_chain.inv();
 
-    // encrypted_chain_sig = k_chain_inverse * r * chain_signing_key * encrypted_user_signing_key + k_chain_inverse * message_hash // This is the homomorphic encryption operation. This is a complicated formula so let me know if it's not clear. Also, TODO: add noise (p*q) later on..
+    // encrypted_chain_sig = k_chain_inverse * r * chain_signing_key * encrypted_user_signing_key + k_chain_inverse * message_hash // This is the homomorphic encryption operation. This is a complicated formula so let me know if it's not clear.
 
     let k_chain_inverse_mul_r_mul_chain_signing_key = BigInt::from_str_radix(
         &(k_chain_inverse.clone() * r * chain_signing_key).to_hex(),
@@ -191,6 +191,33 @@ fn sign(
     let k_chain_inverse_mul_message_hash =
         BigInt::from_str_radix(&(k_chain_inverse * message_hash).to_hex(), 16).unwrap();
 
+    let encrypted_k_chain_inverse_mul_message_hash: EncodedCiphertext<BigInt> =
+        Paillier::encrypt(&enc_public_key, k_chain_inverse_mul_message_hash);
+
+    // noisy_value = (random between 1 and (secp256k1.q)^2) * secp256k1.q
+
+    let secp256k1_q = BigInt::from_str_radix(
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+        16,
+    )
+    .unwrap();
+
+    let secp256k1_q_pow2 = secp256k1_q.clone() * secp256k1_q.clone();
+
+    let rng = &mut ChaChaRng::from_seed([seed /* TODO: use env.block.random */; 32]);
+    let noisy_value: BigInt = loop {
+        let noisy_value = rng.next_u64();
+        if noisy_value > 1 && noisy_value < secp256k1_q_pow2 {
+            break BigInt::from(noisy_value) * secp256k1_q.clone();
+        }
+    };
+
+    let encrypted_noisy_value = Paillier::add(
+        &enc_public_key,
+        encrypted_k_chain_inverse_mul_message_hash,
+        noisy_value,
+    );
+
     let encrypted_chain_sig = Paillier::add(
         &enc_public_key,
         Paillier::mul(
@@ -198,7 +225,7 @@ fn sign(
             encrypted_user_signing_key,
             k_chain_inverse_mul_r_mul_chain_signing_key,
         ),
-        k_chain_inverse_mul_message_hash,
+        encrypted_noisy_value,
     );
 
     let encrypted_chain_sig: Binary = bincode2::serialize(&encrypted_chain_sig).unwrap().into();
